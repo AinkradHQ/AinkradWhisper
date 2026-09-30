@@ -14,7 +14,6 @@ import WebKit
     public private(set) var unread: [UUID: Int] = [:]
     public var selection: UUID?
     public var hibernateMinutes: Int = 15 { didSet { save() } }
-    public var sidebarExpanded = false { didSet { save() } }
     private(set) var pages: [UUID: WhisperPage] = [:]
 
     @ObservationIgnored private let documents: PluginDocumentStore
@@ -27,7 +26,6 @@ import WebKit
     private struct State: Codable {
         var accounts: [Account] = []
         var hibernateMinutes = 15
-        var sidebarExpanded: Bool? = nil
     }
 
     public init(documents: PluginDocumentStore, signals: PluginSignalEmitter) {
@@ -37,7 +35,6 @@ import WebKit
            let state = try? JSONDecoder().decode(State.self, from: data) {
             accounts = state.accounts
             hibernateMinutes = state.hibernateMinutes
-            sidebarExpanded = state.sidebarExpanded ?? false
         }
         selection = accounts.first?.id
     }
@@ -187,7 +184,7 @@ import WebKit
     }
 
     private func save() {
-        let state = State(accounts: accounts, hibernateMinutes: hibernateMinutes, sidebarExpanded: sidebarExpanded)
+        let state = State(accounts: accounts, hibernateMinutes: hibernateMinutes)
         documents.setData(try? JSONEncoder().encode(state), forKey: Self.stateKey)
     }
 }

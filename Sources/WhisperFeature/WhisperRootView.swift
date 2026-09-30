@@ -66,60 +66,33 @@ struct WhisperRootView: View {
         }
     }
 
-    /// Quest's sidebar shape (kit list rows, row actions in the context
-    /// menu, add in the footer), collapsible to icons so it costs ~60pt.
+    /// A quiet column of account tiles: no header, no labels (the name is in
+    /// the tooltip), the add button at the foot.
     private var sidebar: some View {
-        let expanded = store.sidebarExpanded
-        return VStack(alignment: expanded ? .leading : .center, spacing: AinkradSpacing.sm) {
-            HStack(spacing: AinkradSpacing.xs) {
-                if expanded { AinkradSectionHeader(title: "Accounts"); Spacer(minLength: 0) }
-                AinkradIconButton(systemName: "sidebar.left", size: 13,
-                                  tooltip: expanded ? "Collapse sidebar" : "Expand sidebar") {
-                    store.sidebarExpanded.toggle()
-                }
-            }
+        VStack(spacing: AinkradSpacing.md) {
             ScrollView {
-                LazyVStack(spacing: AinkradSpacing.xs) {
-                    ForEach(store.accounts) { account in row(account, expanded: expanded) }
+                VStack(spacing: AinkradSpacing.sm) {
+                    ForEach(store.accounts) { account in
+                        let unread = store.unread[account.id] ?? 0
+                        let status = store.isLoaded(account.id) ? account.service.name
+                                                               : "\(account.service.name) · hibernated"
+                        AccountTile(symbol: account.service.icon, unread: unread,
+                                    isSelected: account.id == store.selection,
+                                    isDimmed: !store.isLoaded(account.id)) { store.selection = account.id }
+                            .help("\(account.label) · \(status)")
+                            .accessibilityLabel("\(account.label), \(status)\(unread > 0 ? ", \(unread) unread" : "")")
+                            .ainkradContextMenu(menu(for: account))
+                    }
                 }
+                .padding(.vertical, AinkradSpacing.md)
             }
             .scrollIndicators(.never)
-            Spacer(minLength: 0)
-            if expanded {
-                AinkradButton(title: "Add account", style: .secondary, icon: "plus") { open(.add, text: "") }
-            } else {
-                AinkradIconButton(systemName: "plus", size: 14, tooltip: "Add account") { open(.add, text: "") }
-            }
+            AccountTile(symbol: "plus", unread: 0, isSelected: false, isDimmed: true) { open(.add, text: "") }
+                .help("Add account")
+                .accessibilityLabel("Add account")
+                .padding(.bottom, AinkradSpacing.md)
         }
-        .padding(expanded ? AinkradSpacing.md : AinkradSpacing.sm)
-        .frame(width: expanded ? 164 : 60)
-        .animation(reduceMotion ? nil : AinkradMotion.present, value: expanded)
-    }
-
-    @ViewBuilder private func row(_ account: Account, expanded: Bool) -> some View {
-        let unread = store.unread[account.id] ?? 0
-        let status = store.isLoaded(account.id) ? account.service.name : "\(account.service.name) · hibernated"
-        let badge = unread > 99 ? "99+" : "\(unread)"
-        let isSelected = account.id == store.selection
-        Group {
-            if expanded {
-                AinkradListRow(isSelected: isSelected, onTap: { store.selection = account.id },
-                               leading: { AinkradIconGlyph(systemName: account.service.icon) },
-                               title: account.label, subtitle: status,
-                               trailing: { if unread > 0 { AinkradBadge(text: badge, status: .danger) } })
-            } else {
-                CompactRow(isSelected: isSelected, onTap: { store.selection = account.id }) {
-                    AinkradIconGlyph(systemName: account.service.icon)
-                        .overlay(alignment: .topTrailing) {
-                            if unread > 0 {
-                                AinkradBadge(text: badge, status: .danger).fixedSize().scaleEffect(0.75).offset(x: 10, y: -9)
-                            }
-                        }
-                }
-            }
-        }
-        .help("\(account.label) · \(status)")
-        .ainkradContextMenu(menu(for: account))
+        .frame(width: 60)
     }
 
     private func menu(for account: Account) -> [AinkradMenuItem] {
@@ -203,38 +176,60 @@ struct WhisperRootView: View {
     }
 }
 
-/// `AinkradListRow`'s look for a row with no title: the list row lays out a
-/// title column and padding that do not fit a 60pt sidebar, so the icon was
-/// clipped. Same fills, same accent edge, same hover motion.
-// ponytail: belongs in AinkradAppKit as a compact AinkradListRow variant; propose it there.
-private struct CompactRow<Content: View>: View {
+/// One sidebar tile. Drawn in `AinkradListRow`'s vocabulary (chamfered fill,
+/// glowing accent edge, hover motion) because the kit has no icon-only row,
+/// and the list row's title column does not fit a 60pt sidebar.
+// ponytail: belongs in AinkradAppKit as a compact list-row variant; propose it there.
+private struct AccountTile: View {
+    let symbol: String
+    let unread: Int
     let isSelected: Bool
+    let isDimmed: Bool
     let onTap: () -> Void
-    @ViewBuilder let content: Content
 
     @State private var hovering = false
     @Environment(\.ainkradTheme) private var theme
     @Environment(\.ainkradReduceMotion) private var reduceMotion
 
     private var fill: Color {
-        if isSelected { return theme.accentPrimary.opacity(0.16) }
-        return hovering ? theme.surfaceElevated.opacity(0.5) : .clear
+        if isSelected { return theme.accentPrimary.opacity(0.18) }
+        return hovering ? theme.surfaceElevated.opacity(0.6) : .clear
+    }
+
+    private var glyphColor: Color {
+        if isSelected { return theme.accentSecondary }
+        return theme.foreground.opacity(hovering ? 0.9 : (isDimmed ? 0.45 : 0.65))
     }
 
     var body: some View {
-        content
-            .frame(width: 40, height: 36)
-            .background(ChamferShape(cut: 6).fill(fill))
-            .overlay(alignment: .leading) {
-                Rectangle().fill(theme.accentSecondary)
-                    .frame(width: isSelected || hovering ? 2 : 0)
-                    .shadow(color: theme.accentSecondary.opacity(isSelected ? 0.6 : 0), radius: 3)
+        Image(systemName: symbol)
+            .font(.system(size: 17, weight: isSelected ? .semibold : .regular))
+            .foregroundStyle(glyphColor)
+            .shadow(color: theme.accentSecondary.opacity(isSelected ? 0.5 : 0), radius: 4)
+            .frame(width: 42, height: 42)
+            .background(ChamferShape(cut: 7).fill(fill))
+            .overlay(ChamferShape(cut: 7).strokeBorder(theme.accentSecondary.opacity(isSelected ? 0.35 : 0), lineWidth: 1))
+            .overlay(alignment: .topTrailing) {
+                if unread > 0 {
+                    AinkradBadge(text: unread > 99 ? "99+" : "\(unread)", status: .danger)
+                        .fixedSize()
+                        .scaleEffect(0.8, anchor: .topTrailing)
+                        .offset(x: 5, y: -5)
+                }
             }
-            .clipShape(ChamferShape(cut: 6))
+            .frame(maxWidth: .infinity)
+            .overlay(alignment: .leading) {
+                // The kit's selection edge: grows in, glows when selected.
+                Capsule().fill(theme.accentSecondary)
+                    .frame(width: 3, height: isSelected ? 22 : (hovering ? 10 : 0))
+                    .shadow(color: theme.accentSecondary.opacity(isSelected ? 0.7 : 0), radius: 3)
+            }
+            .scaleEffect(hovering && !isSelected && !reduceMotion ? 1.06 : 1)
             .contentShape(Rectangle())
             .onHover { hovering = $0 }
             .onTapGesture(perform: onTap)
             .animation(reduceMotion ? nil : AinkradMotion.hover, value: hovering)
+            .animation(reduceMotion ? nil : AinkradMotion.hover, value: isSelected)
             .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 }
