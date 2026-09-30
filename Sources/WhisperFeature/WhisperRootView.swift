@@ -96,26 +96,30 @@ struct WhisperRootView: View {
         .animation(reduceMotion ? nil : AinkradMotion.present, value: expanded)
     }
 
-    private func row(_ account: Account, expanded: Bool) -> some View {
+    @ViewBuilder private func row(_ account: Account, expanded: Bool) -> some View {
         let unread = store.unread[account.id] ?? 0
         let status = store.isLoaded(account.id) ? account.service.name : "\(account.service.name) · hibernated"
         let badge = unread > 99 ? "99+" : "\(unread)"
-        return AinkradListRow(
-            isSelected: account.id == store.selection,
-            onTap: { store.selection = account.id },
-            leading: {
-                AinkradIconGlyph(systemName: account.service.icon)
-                    .overlay(alignment: .topTrailing) {
-                        if !expanded && unread > 0 {
-                            AinkradBadge(text: badge, status: .danger).fixedSize().scaleEffect(0.8).offset(x: 12, y: -10)
+        let isSelected = account.id == store.selection
+        Group {
+            if expanded {
+                AinkradListRow(isSelected: isSelected, onTap: { store.selection = account.id },
+                               leading: { AinkradIconGlyph(systemName: account.service.icon) },
+                               title: account.label, subtitle: status,
+                               trailing: { if unread > 0 { AinkradBadge(text: badge, status: .danger) } })
+            } else {
+                CompactRow(isSelected: isSelected, onTap: { store.selection = account.id }) {
+                    AinkradIconGlyph(systemName: account.service.icon)
+                        .overlay(alignment: .topTrailing) {
+                            if unread > 0 {
+                                AinkradBadge(text: badge, status: .danger).fixedSize().scaleEffect(0.75).offset(x: 10, y: -9)
+                            }
                         }
-                    }
-            },
-            title: expanded ? account.label : "",
-            subtitle: expanded ? status : nil,
-            trailing: { if expanded && unread > 0 { AinkradBadge(text: badge, status: .danger) } })
-            .help("\(account.label) · \(status)")
-            .ainkradContextMenu(menu(for: account))
+                }
+            }
+        }
+        .help("\(account.label) · \(status)")
+        .ainkradContextMenu(menu(for: account))
     }
 
     private func menu(for account: Account) -> [AinkradMenuItem] {
@@ -196,6 +200,42 @@ struct WhisperRootView: View {
                     .opacity(enabled ? 1 : 0.5)
             }
         }
+    }
+}
+
+/// `AinkradListRow`'s look for a row with no title: the list row lays out a
+/// title column and padding that do not fit a 60pt sidebar, so the icon was
+/// clipped. Same fills, same accent edge, same hover motion.
+// ponytail: belongs in AinkradAppKit as a compact AinkradListRow variant; propose it there.
+private struct CompactRow<Content: View>: View {
+    let isSelected: Bool
+    let onTap: () -> Void
+    @ViewBuilder let content: Content
+
+    @State private var hovering = false
+    @Environment(\.ainkradTheme) private var theme
+    @Environment(\.ainkradReduceMotion) private var reduceMotion
+
+    private var fill: Color {
+        if isSelected { return theme.accentPrimary.opacity(0.16) }
+        return hovering ? theme.surfaceElevated.opacity(0.5) : .clear
+    }
+
+    var body: some View {
+        content
+            .frame(width: 40, height: 36)
+            .background(ChamferShape(cut: 6).fill(fill))
+            .overlay(alignment: .leading) {
+                Rectangle().fill(theme.accentSecondary)
+                    .frame(width: isSelected || hovering ? 2 : 0)
+                    .shadow(color: theme.accentSecondary.opacity(isSelected ? 0.6 : 0), radius: 3)
+            }
+            .clipShape(ChamferShape(cut: 6))
+            .contentShape(Rectangle())
+            .onHover { hovering = $0 }
+            .onTapGesture(perform: onTap)
+            .animation(reduceMotion ? nil : AinkradMotion.hover, value: hovering)
+            .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 }
 
