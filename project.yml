@@ -17,9 +17,9 @@ packages:
     # At or behind the host's pin, never ahead: the host embeds the one dynamic
     # copy of the SDK and a newer pin links symbols it does not define. See the
     # long comment in AinkradQuest/project.yml for why "behind" is not free either.
-    # ecea895: AinkradMenuButton placement: .trailing (#51) for the rail's + menu.
-    # Needs a host at ecea895 or later (Ainkrad #196).
-    revision: ecea895e92bd5542cb75cf709f0127c01402f267
+    # 0f21be3: AinkradMenuButton placement: .trailing (#51) for the rail's + menu.
+    # Needs a host at 0f21be3 or later (Ainkrad #196).
+    revision: 0f21be31996c4426078c75b7991774a5127f65f8
 targets:
   WhisperFeature:
     type: library.static
