@@ -43,7 +43,12 @@ import AinkradAppKit
                 schemaJSON: #"{"type":"object","properties":{\#(account),\#(chat),"text":{"type":"string","maxLength":10000}},"required":["account","chat","text"]}"#,
                 destructive: true) { await run(.send, $0, store) },
         ]
-        let rejected = tools.filter { !server.addTool($0) }.map(\.name)
+        let events = MCPToolSpec(
+            name: "list_events",
+            description: "Lists upcoming meetings and events from the Teams (Outlook) calendar and the Google Meet schedule, soonest first. Slack has no calendar of its own. Omit account to read every calendar.",
+            schemaJSON: #"{"type":"object","properties":{"account":{"type":"string","description":"Optional: a Teams or Google Meet account from list_accounts."},"days":{"type":"integer","minimum":1,"maximum":14,"description":"How many days ahead, from today. Default 7."}}}"#,
+            readOnly: true) { await listEvents($0, store) }
+        let rejected = (tools + [events]).filter { !server.addTool($0) }.map(\.name)
         if !rejected.isEmpty { log.error("Whisper MCP: tools rejected — \(rejected.joined(separator: ", "))") }
         return server
     }
@@ -72,6 +77,49 @@ import AinkradAppKit
             let message = (error as NSError).userInfo["WKJavaScriptExceptionMessage"] as? String
             return failure("\(account.label): \(message ?? error.localizedDescription)")
         }
+    }
+
+    /// Reads each calendar account in turn and merges the events by start
+    /// time. One account failing (signed out, mid-meeting) is reported next to
+    /// the others' events rather than failing the whole call.
+    private static func listEvents(_ argumentsJSON: String, _ store: WhisperStore) async -> AgentActionResult {
+        let input = (try? JSONSerialization.jsonObject(with: Data(argumentsJSON.utf8))) as? [String: Any] ?? [:]
+        let days = min(max(input["days"] as? Int ?? 7, 1), 14)
+        let targets: [Account]
+        if let reference = input["account"] as? String {
+            guard let account = store.resolve(reference) else {
+                return failure("Unknown account. Call list_accounts and pass a label or id.")
+            }
+            guard CalendarScripts.script(for: account.service) != nil else {
+                return failure("\(account.label) (\(account.service.name)) has no calendar; Teams and Google Meet do.")
+            }
+            targets = [account]
+        } else {
+            targets = store.accounts.filter { CalendarScripts.script(for: $0.service) != nil }
+            if targets.isEmpty { return failure("No Teams or Google Meet account in Whisper.") }
+        }
+        var events: [[String: Any]] = [], errors: [[String: String]] = []
+        for account in targets {
+            guard let script = CalendarScripts.script(for: account.service) else { continue }
+            let page = await store.loadedPage(for: account)
+            do {
+                // One retry: a page that just woke from hibernation can still be
+                // redirecting through sign-in, which discards a running script.
+                let json: String
+                do { json = try await page.run(script, arguments: ["days": days]) } catch {
+                    try? await Task.sleep(for: .seconds(3))
+                    json = try await page.run(script, arguments: ["days": days])
+                }
+                let rows = (try? JSONSerialization.jsonObject(with: Data(json.utf8))) as? [[String: Any]] ?? []
+                events += rows.map { $0.merging(["account": account.label, "service": account.service.name]) { a, _ in a } }
+            } catch {
+                let message = (error as NSError).userInfo["WKJavaScriptExceptionMessage"] as? String
+                errors.append(["account": account.label, "error": message ?? error.localizedDescription])
+            }
+        }
+        events.sort { ($0["startMs"] as? Double ?? 0) < ($1["startMs"] as? Double ?? 0) }
+        return AgentActionResult(text: json(["days": days, "events": events, "errors": errors]),
+                                 isError: events.isEmpty && !errors.isEmpty)
     }
 
     private static func failure(_ text: String) -> AgentActionResult { AgentActionResult(text: text, isError: true) }
