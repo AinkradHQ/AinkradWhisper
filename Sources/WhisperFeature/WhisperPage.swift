@@ -28,6 +28,8 @@ import WebKit
         config.mediaTypesRequiringUserActionForPlayback = []
         config.userContentController.addUserScript(
             WKUserScript(source: Self.notificationShim, injectionTime: .atDocumentStart, forMainFrameOnly: false))
+        config.userContentController.addUserScript(
+            WKUserScript(source: Self.presenceShim, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         webView = WKWebView(frame: .zero, configuration: config)
         super.init()
         config.userContentController.add(WeakHandler(self), name: "whisper")
@@ -101,6 +103,26 @@ import WebKit
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         loaded = true
         finishWaiters()
+        applyPresence() // a reload starts from the shim's default
+    }
+
+    // MARK: Presence
+
+    private var presence: (visible: Bool, focused: Bool)?
+
+    /// Tells the page whether the user can see it and is using it. WebKit
+    /// reports a parked webview as visible and focused (occlusion detection
+    /// is off so it keeps running), and Teams then shows its own in-page toast
+    /// instead of a notification, so it never notified at all.
+    func setPresence(visible: Bool, focused: Bool) {
+        guard presence?.visible != visible || presence?.focused != focused else { return }
+        presence = (visible, focused)
+        applyPresence()
+    }
+
+    private func applyPresence() {
+        guard let presence else { return }
+        webView.evaluateJavaScript("window.__whisperPresence && window.__whisperPresence(\(presence.visible), \(presence.focused))")
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) { webView.reload() }
@@ -217,6 +239,25 @@ import WebKit
         (try? await run("return JSON.stringify(window.__whisperClick ? window.__whisperClick(id) : false);",
                         arguments: ["id": id])) == "true"
     }
+
+    /// `document.visibilityState`, `hidden` and `hasFocus()` as Whisper knows
+    /// them, not as WebKit reports a parked view. Starts hidden, since pages
+    /// load parked; `setPresence` updates it and fires the events a browser
+    /// fires when a tab is shown, hidden, focused or blurred.
+    static let presenceShim = """
+    (() => {
+      let visible = false, focused = false;
+      Object.defineProperty(Document.prototype, 'visibilityState', { configurable: true, get: () => visible ? 'visible' : 'hidden' });
+      Object.defineProperty(Document.prototype, 'hidden', { configurable: true, get: () => !visible });
+      Document.prototype.hasFocus = function () { return focused };
+      window.__whisperPresence = (v, f) => {
+        const shown = v !== visible, focus = f !== focused;
+        visible = v; focused = f;
+        if (shown) document.dispatchEvent(new Event('visibilitychange'));
+        if (focus) window.dispatchEvent(new Event(f ? 'focus' : 'blur'));
+      };
+    })();
+    """
 
     /// Replaces the web Notification API (a WKWebView has none) and forwards
     /// each notification to the host as a signal. Each one is kept (the last

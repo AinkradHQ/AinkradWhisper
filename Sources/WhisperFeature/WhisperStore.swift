@@ -21,6 +21,7 @@ import WebKit
     @ObservationIgnored private var parking: NSWindow?
     @ObservationIgnored private var hibernateTimer: Timer?
     @ObservationIgnored private var noNap: NSObjectProtocol?
+    @ObservationIgnored private var presenceObservers: [NSObjectProtocol] = []
 
     private static let stateKey = "state"
     private struct State: Codable {
@@ -117,6 +118,7 @@ import WebKit
         webView.frame = container.bounds
         webView.autoresizingMask = [.width, .height]
         container.addSubview(webView)
+        Task { @MainActor in self.refreshPresence() } // once the view is in its window
     }
 
     /// Moves every webview out of `container` so it keeps running once the pane is gone.
@@ -130,7 +132,10 @@ import WebKit
         view.removeFromSuperview()
         view.frame = window.contentView?.bounds ?? .zero
         window.contentView?.addSubview(view)
-        if let page = pages.values.first(where: { $0.webView === view }) { page.lastUsed = Date() }
+        if let page = pages.values.first(where: { $0.webView === view }) {
+            page.lastUsed = Date()
+            page.setPresence(visible: false, focused: false)
+        }
     }
 
     /// Where webviews live while no pane shows them: a window, because WebKit
@@ -155,6 +160,17 @@ import WebKit
         if noNap == nil {
             noNap = ProcessInfo.processInfo.beginActivity(
                 options: [.userInitiatedAllowingIdleSystemSleep], reason: "Whisper keeps messengers connected")
+        }
+        if presenceObservers.isEmpty {
+            let center = NotificationCenter.default
+            for name in [NSApplication.didBecomeActiveNotification, NSApplication.didResignActiveNotification,
+                         NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification,
+                         NSWindow.didChangeOcclusionStateNotification, NSWindow.didMiniaturizeNotification,
+                         NSWindow.didDeminiaturizeNotification] {
+                presenceObservers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.refreshPresence() }
+                })
+            }
         }
         guard hibernateTimer == nil else { return }
         hibernateTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
@@ -227,9 +243,22 @@ import WebKit
     /// The user is already looking at this account: Ainkrad is frontmost and
     /// its webview is on screen in a visible pane, not parked.
     private func isLooking(at id: UUID) -> Bool {
-        guard NSApp.isActive, selection == id, let window = pages[id]?.webView.window,
-              window !== parking, window.isVisible else { return false }
+        guard selection == id, let page = pages[id] else { return false }
+        return isOnScreen(page)
+    }
+
+    private func isOnScreen(_ page: WhisperPage) -> Bool {
+        guard NSApp.isActive, let window = page.webView.window, window !== parking, window.isVisible else { return false }
         return window.occlusionState.contains(.visible)
+    }
+
+    /// Keeps every page's idea of visible and focused true to what the user
+    /// sees, so each web app decides for itself when to notify.
+    func refreshPresence() {
+        for page in pages.values {
+            let visible = isOnScreen(page)
+            page.setPresence(visible: visible, focused: visible && page.webView.window?.isKeyWindow == true)
+        }
     }
 
     /// A notification click: show the account, then have its web app open
