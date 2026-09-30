@@ -40,8 +40,8 @@ import WebKit
         #if DEBUG
         webView.isInspectable = true
         #endif
-        titleObservation = webView.observe(\.title) { [weak self] webView, _ in
-            let title = webView.title ?? ""
+        titleObservation = webView.observe(\.title, options: [.new]) { [weak self] _, change in
+            let title = (change.newValue ?? nil) ?? ""
             Task { @MainActor in self?.onTitle(title) }
         }
         if let url = account.url { webView.load(URLRequest(url: url)) }

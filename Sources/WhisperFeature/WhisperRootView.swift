@@ -52,8 +52,8 @@ struct WhisperRootView: View {
 
     @ViewBuilder private var content: some View {
         if let account = store.accounts.first(where: { $0.id == store.selection }) {
-            // AinkradCard's resting look (chamfer, surface fill, accent
-            // hairline) without its hover zoom, which would scale the chat.
+            // AinkradCard's look (chamfer, surface fill, accent hairline)
+            // with a steady glow and none of the card's hover effects.
             Group {
                 if isDialogUp {
                     theme.surface
@@ -63,7 +63,9 @@ struct WhisperRootView: View {
             }
             .clipShape(ChamferShape(cut: AinkradRadius.md))
             .background(ChamferShape(cut: AinkradRadius.md).fill(theme.surface.opacity(0.9)))
-            .overlay(ChamferShape(cut: AinkradRadius.md).strokeBorder(theme.accentSecondary.opacity(0.25), lineWidth: 1))
+            // A steady glow: nothing on this card moves or brightens with the pointer.
+            .overlay(ChamferShape(cut: AinkradRadius.md).strokeBorder(theme.accentSecondary.opacity(0.5), lineWidth: 1))
+            .shadow(color: theme.accentSecondary.opacity(0.3), radius: 10)
             .padding([.vertical, .trailing], AinkradSpacing.sm)
         } else {
             AinkradEmptyState(icon: WhisperApp.icon, title: "No accounts yet",
@@ -93,7 +95,7 @@ struct WhisperRootView: View {
                 .padding(.vertical, AinkradSpacing.md)
             }
             .scrollIndicators(.never)
-            AinkradMenuButton(items: addItems) {
+            AinkradMenuButton(items: addItems, placement: .trailing) {
                 AccountTile(symbol: "plus", unread: 0, isSelected: false, isDimmed: true, onTap: nil)
             }
             .help("Add account")
@@ -199,7 +201,11 @@ private struct AccountTile: View {
             .shadow(color: theme.accentSecondary.opacity(isSelected ? 0.5 : 0), radius: 4)
             .frame(width: 42, height: 42)
             .background(ChamferShape(cut: 7).fill(fill))
-            .overlay(ChamferShape(cut: 7).strokeBorder(theme.accentSecondary.opacity(isSelected ? 0.35 : 0), lineWidth: 1))
+            .overlay(ChamferShape(cut: 7)
+                .strokeBorder(theme.accentSecondary.opacity(isSelected ? 0.6 : (hovering ? 0.35 : 0)), lineWidth: 1))
+            // AinkradAppTile's glow: brighter when selected, a softer one on hover.
+            .shadow(color: theme.accentPrimary.opacity(isSelected ? 0.5 : (hovering ? 0.35 : 0)),
+                    radius: isSelected || hovering ? 8 : 0)
             .overlay(alignment: .topTrailing) {
                 if unread > 0 {
                     AinkradBadge(text: unread > 99 ? "99+" : "\(unread)", status: .danger)
