@@ -94,7 +94,7 @@ import WebKit
         let page = WhisperPage(account: account)
         let id = account.id
         page.onTitle = { [weak self] title in self?.unread[id] = unreadCount(fromTitle: title) }
-        page.onNotify = { [weak self] title, body in self?.notify(id, title: title, body: body) }
+        page.onNotify = { [weak self] note in self?.notify(id, note) }
         pages[id] = page
         park(page.webView)
         return page
@@ -175,12 +175,82 @@ import WebKit
         }
     }
 
-    private func notify(_ id: UUID, title: String, body: String) {
-        guard let account = accounts.first(where: { $0.id == id }) else { return }
-        signals.emit(kind: "whisper.message", severity: .info,
-                     title: title.isEmpty ? account.label : "\(account.label) · \(title)",
-                     body: body.isEmpty ? nil : body,
-                     deepLink: SignalDeepLink(appID: WhisperApp.id, payload: Data(id.uuidString.utf8)))
+    // MARK: Notifications
+
+    /// "Mark as read" handlers, one per notification (a handler cannot see
+    /// which event invoked it). Oldest are dropped past 50.
+    @ObservationIgnored private var actionTokens: [(id: String, token: AgentActionToken)] = []
+
+    /// What a notification click carries back to Whisper.
+    struct NotificationTarget: Codable {
+        let account: UUID
+        let note: String
+        let chat: String
+    }
+
+    private func notify(_ id: UUID, _ note: PageNotification) {
+        guard let account = accounts.first(where: { $0.id == id }), !account.isMuted, !isLooking(at: id) else { return }
+        let target = NotificationTarget(account: id, note: note.id, chat: note.title)
+        let payload = (try? JSONEncoder().encode(target)) ?? Data(id.uuidString.utf8)
+        var actions: [SignalAction] = []
+        if !note.isCall {
+            let actionID = "read:\(id.uuidString):\(note.id)"
+            let token = signals.handleAction(actionID) { [weak self] in await self?.markRead(target) }
+            actionTokens.append((actionID, token))
+            if actionTokens.count > 50 { signals.removeActionHandler(actionTokens.removeFirst().token) }
+            actions = [SignalAction(id: actionID, label: "Mark as read")]
+        }
+        signals.emit(kind: note.isCall ? "whisper.call" : "whisper.message", severity: .info,
+                     title: note.title.isEmpty ? account.label : "\(account.label) · \(note.title)",
+                     body: note.body.isEmpty ? nil : note.body,
+                     importance: note.isCall ? .urgent : .normal,
+                     deepLink: SignalDeepLink(appID: WhisperApp.id, payload: payload),
+                     actions: actions,
+                     dedupeKey: note.isCall ? nil : note.groupKey(account: id))
+    }
+
+    /// The user is already looking at this account: Ainkrad is frontmost and
+    /// its webview is on screen in a visible pane, not parked.
+    private func isLooking(at id: UUID) -> Bool {
+        guard NSApp.isActive, selection == id, let window = pages[id]?.webView.window,
+              window !== parking, window.isVisible else { return false }
+        return window.occlusionState.contains(.visible)
+    }
+
+    /// A notification click: show the account, then have its web app open
+    /// the chat, by replaying the click on the page's own notification (or,
+    /// for WhatsApp, opening the chat by name when the page no longer has it).
+    func open(_ payload: String) {
+        guard let target = decodeTarget(payload) else { return }
+        selection = target.account
+        Task { await openChat(target) }
+    }
+
+    /// "Mark as read": the web app opens the chat in its page, which marks
+    /// it read, without switching the account Whisper shows.
+    private func markRead(_ target: NotificationTarget) async { await openChat(target) }
+
+    private func openChat(_ target: NotificationTarget) async {
+        guard let account = accounts.first(where: { $0.id == target.account }), !target.note.isEmpty else { return }
+        let page = await loadedPage(for: account)
+        if await page.clickNotification(target.note) { return }
+        if account.service == .whatsapp, !target.chat.isEmpty {
+            _ = try? await page.run(ServiceScripts.whatsappOpenChat, arguments: ["chat": target.chat])
+        }
+    }
+
+    /// The JSON target, or a bare account id from a notification raised before targets existed.
+    private func decodeTarget(_ payload: String) -> NotificationTarget? {
+        if let target = try? JSONDecoder().decode(NotificationTarget.self, from: Data(payload.utf8)),
+           accounts.contains(where: { $0.id == target.account }) { return target }
+        guard let id = UUID(uuidString: payload), accounts.contains(where: { $0.id == id }) else { return nil }
+        return NotificationTarget(account: id, note: "", chat: "")
+    }
+
+    public func setMuted(_ id: UUID, _ muted: Bool) {
+        guard let index = accounts.firstIndex(where: { $0.id == id }) else { return }
+        accounts[index].muted = muted ? true : nil
+        save()
     }
 
     private func save() {

@@ -41,13 +41,11 @@ struct WhisperRootView: View {
             confirmTitle: "Remove", isDestructive: true) {
                 if let removing { store.remove(removing.id) }
             }
-        .onAppear {
-            // A notification click that opened this pane names its account.
-            if let id = launcher.takePendingLaunch().flatMap(UUID.init(uuidString:)),
-               store.accounts.contains(where: { $0.id == id }) {
-                store.selection = id
-            }
-        }
+        // A notification click names the account and chat. It arrives as the
+        // launch payload when it opened this pane, or, when the pane was already
+        // open, in the host's short-lived slot, hence the poll.
+        .onAppear(perform: takeLaunch)
+        .onReceive(Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()) { _ in takeLaunch() }
     }
 
     @ViewBuilder private var content: some View {
@@ -82,11 +80,14 @@ struct WhisperRootView: View {
                 VStack(spacing: AinkradSpacing.sm) {
                     ForEach(store.accounts) { account in
                         let unread = store.unread[account.id] ?? 0
-                        let status = store.isLoaded(account.id) ? account.service.name
-                                                               : "\(account.service.name) · hibernated"
+                        let status = (store.isLoaded(account.id) ? account.service.name
+                                                                 : "\(account.service.name) · hibernated")
+                            + (account.isMuted ? " · muted" : "")
                         AccountTile(symbol: account.service.icon, unread: unread,
                                     isSelected: account.id == store.selection,
-                                    isDimmed: !store.isLoaded(account.id)) { store.selection = account.id }
+                                    isDimmed: !store.isLoaded(account.id), isMuted: account.isMuted) {
+                            store.selection = account.id
+                        }
                             .help("\(account.label) · \(status)")
                             .accessibilityLabel("\(account.label), \(status)\(unread > 0 ? ", \(unread) unread" : "")")
                             .ainkradContextMenu(menu(for: account))
@@ -96,7 +97,7 @@ struct WhisperRootView: View {
             }
             .scrollIndicators(.never)
             AinkradMenuButton(items: addItems, placement: .trailing) {
-                AccountTile(symbol: "plus", unread: 0, isSelected: false, isDimmed: true, onTap: nil)
+                AccountTile(symbol: "plus", unread: 0, isSelected: false, isDimmed: true, isMuted: false, onTap: nil)
             }
             .help("Add account")
             .accessibilityLabel("Add account")
@@ -113,10 +114,17 @@ struct WhisperRootView: View {
         } + [AinkradMenuItem(title: "Other web app…", systemName: Service.custom.icon) { open(.addWebApp, text: "https://") }]
     }
 
+    private func takeLaunch() {
+        if let payload = launcher.takePendingLaunch() { store.open(payload) }
+    }
+
     private func menu(for account: Account) -> [AinkradMenuItem] {
         [
             AinkradMenuItem(title: "Rename…", systemName: "pencil") { open(.rename(account), text: account.label) },
             AinkradMenuItem(title: "Reload", systemName: "arrow.clockwise") { store.reload(account.id) },
+            account.isMuted
+                ? AinkradMenuItem(title: "Unmute notifications", systemName: "bell") { store.setMuted(account.id, false) }
+                : AinkradMenuItem(title: "Mute notifications", systemName: "bell.slash") { store.setMuted(account.id, true) },
             AinkradMenuItem(title: "Remove…", systemName: "trash", isDestructive: true) { removing = account },
         ]
     }
@@ -177,6 +185,7 @@ private struct AccountTile: View {
     let unread: Int
     let isSelected: Bool
     let isDimmed: Bool
+    let isMuted: Bool
     /// Nil when the tile is another control's label (the + menu button).
     let onTap: (() -> Void)?
 
@@ -212,6 +221,16 @@ private struct AccountTile: View {
                         .fixedSize()
                         .scaleEffect(0.8, anchor: .topTrailing)
                         .offset(x: 5, y: -5)
+                }
+            }
+            .overlay(alignment: .bottomTrailing) {
+                if isMuted {
+                    Image(systemName: "bell.slash.fill")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(theme.foreground.opacity(0.7))
+                        .padding(3)
+                        .background(Circle().fill(theme.surfaceElevated))
+                        .offset(x: 4, y: 4)
                 }
             }
             .frame(maxWidth: .infinity)

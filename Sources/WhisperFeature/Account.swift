@@ -59,6 +59,10 @@ public struct Account: Codable, Identifiable, Equatable, Sendable {
     public var label: String
     /// Only for `.custom`; the others use `service.defaultURL`.
     public var customURL: URL?
+    /// Optional so accounts saved before muting existed still decode.
+    public var muted: Bool?
+
+    var isMuted: Bool { muted == true }
 
     var url: URL? { customURL ?? service.defaultURL }
 
@@ -75,4 +79,27 @@ public struct Account: Codable, Identifiable, Equatable, Sendable {
 func unreadCount(fromTitle title: String) -> Int {
     if let match = title.firstMatch(of: /^\((\d+)\)/) { return Int(match.1) ?? 0 }
     return title.hasPrefix("*") ? 1 : 0
+}
+
+/// A notification a page raised, as the shim reports it.
+struct PageNotification: Equatable, Sendable {
+    /// The shim's handle for the page's own notification object.
+    let id: String
+    let title: String
+    let body: String
+    /// The web app's own grouping tag (often the chat), when it sets one.
+    let tag: String
+
+    /// Incoming calls and huddle invites, across the services' wordings.
+    var isCall: Bool {
+        let text = "\(title) \(body)"
+        return text.range(of: #"incoming (voice |video )?call|is calling|calling you|video call|voice call|huddle"#,
+                          options: [.regularExpression, .caseInsensitive]) != nil
+    }
+
+    /// One entry per chat: repeats from the same chat within a minute fold
+    /// into one notification showing the newest message.
+    func groupKey(account: UUID) -> String {
+        "\(account.uuidString):\(tag.isEmpty ? title : tag)"
+    }
 }

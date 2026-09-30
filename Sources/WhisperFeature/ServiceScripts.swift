@@ -29,6 +29,10 @@ enum ServiceScripts {
         }
     }
 
+    /// Opens a WhatsApp chat by name (the `chat` variable), for a
+    /// notification click whose notification the page no longer holds.
+    static var whatsappOpenChat: String { common + whatsapp + "await open(chat);\nreturn JSON.stringify(true);" }
+
     private static let common = """
     const sleep = ms => new Promise(r => setTimeout(r, ms));
 

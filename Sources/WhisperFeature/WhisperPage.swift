@@ -10,7 +10,7 @@ import WebKit
     let webView: WKWebView
     var lastUsed = Date()
     var onTitle: (String) -> Void = { _ in }
-    var onNotify: (_ title: String, _ body: String) -> Void = { _, _ in }
+    var onNotify: (PageNotification) -> Void = { _ in }
 
     private var popups: [NSWindow] = []
     private var titleObservation: NSKeyValueObservation?
@@ -90,8 +90,10 @@ import WebKit
 
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
         guard let body = message.body as? [String: Any], body["kind"] as? String == "notify" else { return }
-        onNotify(String((body["title"] as? String ?? "").prefix(200)),
-                 String((body["body"] as? String ?? "").prefix(500)))
+        onNotify(PageNotification(id: String((body["id"] as? String ?? "").prefix(40)),
+                                  title: String((body["title"] as? String ?? "").prefix(200)),
+                                  body: String((body["body"] as? String ?? "").prefix(500)),
+                                  tag: String((body["tag"] as? String ?? "").prefix(200))))
     }
 
     // MARK: Navigation
@@ -208,21 +210,51 @@ import WebKit
         completionHandler(alert.runModal() == .alertFirstButtonReturn)
     }
 
+    /// Clicks the page's own notification object, so the web app runs its own
+    /// click handler, which opens the chat that notified. False when the page
+    /// no longer holds it (reloaded, or a service-worker notification).
+    func clickNotification(_ id: String) async -> Bool {
+        (try? await run("return JSON.stringify(window.__whisperClick ? window.__whisperClick(id) : false);",
+                        arguments: ["id": id])) == "true"
+    }
+
     /// Replaces the web Notification API (a WKWebView has none) and forwards
-    /// each notification to the host as a signal.
+    /// each notification to the host as a signal. Each one is kept (the last
+    /// 50) under an id, so a later click on the banner can be replayed into the
+    /// page as a click on the notification the web app created.
     static let notificationShim = """
     (() => {
       const post = m => { try { webkit.messageHandlers.whisper.postMessage(m) } catch (_) {} };
-      const notify = (t, o) => post({ kind: 'notify', title: String(t), body: String((o && o.body) || '') });
+      const notes = new Map();
+      let seq = 0;
+      const notify = (t, o, n) => {
+        const id = Date.now().toString(36) + '-' + (++seq);
+        if (n) { notes.set(id, n); if (notes.size > 50) notes.delete(notes.keys().next().value) }
+        post({ kind: 'notify', id, title: String(t), body: String((o && o.body) || ''), tag: String((o && o.tag) || '') });
+      };
       class N extends EventTarget {
-        constructor(t, o) { super(); notify(t, o) }
+        constructor(t, o) {
+          super();
+          this.title = String(t); this.body = (o && o.body) || ''; this.tag = (o && o.tag) || ''; this.data = o && o.data;
+          this.onclick = null; this.onclose = null; this.onshow = null; this.onerror = null;
+          notify(t, o, this);
+        }
         static get permission() { return 'granted' }
         static requestPermission(cb) { cb && cb('granted'); return Promise.resolve('granted') }
         close() {}
       }
       window.Notification = N;
+      window.__whisperClick = id => {
+        const n = notes.get(id);
+        if (!n) return false;
+        notes.delete(id);
+        const e = new Event('click', { cancelable: true });
+        try { n.onclick && n.onclick.call(n, e) } catch (_) {}
+        n.dispatchEvent(e);
+        return true;
+      };
       if (window.ServiceWorkerRegistration)
-        ServiceWorkerRegistration.prototype.showNotification = function (t, o) { notify(t, o); return Promise.resolve() };
+        ServiceWorkerRegistration.prototype.showNotification = function (t, o) { notify(t, o, null); return Promise.resolve() };
     })();
     """
 }

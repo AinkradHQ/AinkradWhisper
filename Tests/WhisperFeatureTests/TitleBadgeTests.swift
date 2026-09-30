@@ -24,4 +24,25 @@ final class TitleBadgeTests: XCTestCase {
         XCTAssertTrue(web.owns(URL(string: "https://chat.example.com/room")))
         XCTAssertFalse(web.owns(URL(string: "https://example.com")))
     }
+
+    func testNotificationCallsAndGrouping() {
+        let call = PageNotification(id: "1", title: "Mam", body: "Incoming voice call", tag: "")
+        XCTAssertTrue(call.isCall)
+        XCTAssertTrue(PageNotification(id: "2", title: "Ahmed is calling you", body: "", tag: "").isCall)
+        XCTAssertTrue(PageNotification(id: "3", title: "Ghada", body: "invited you to a huddle", tag: "").isCall)
+        XCTAssertFalse(PageNotification(id: "4", title: "Islam", body: "see you at the call later?", tag: "").isCall)
+
+        let account = UUID()
+        let a = PageNotification(id: "5", title: "Mam", body: "hi", tag: "")
+        let b = PageNotification(id: "6", title: "Mam", body: "again", tag: "")
+        XCTAssertEqual(a.groupKey(account: account), b.groupKey(account: account))
+        let tagged = PageNotification(id: "7", title: "New message", body: "x", tag: "C0123")
+        XCTAssertEqual(tagged.groupKey(account: account), "\(account.uuidString):C0123")
+    }
+
+    func testAccountsSavedBeforeMuteStillDecode() throws {
+        let old = #"{"id":"3F2504E0-4F89-11D3-9A0C-0305E82C3301","service":"slack","label":"Slack"}"#
+        let account = try JSONDecoder().decode(Account.self, from: Data(old.utf8))
+        XCTAssertFalse(account.isMuted)
+    }
 }

@@ -39,7 +39,8 @@ public struct WhisperApp: AinkradApp {
         var accountFields = store.accounts.map { account in
             SettingsField(
                 path: accounts.appending(account.id.uuidString), label: account.label,
-                help: "\(account.service.name) · \(store.isLoaded(account.id) ? "connected" : "not loaded")",
+                help: "\(account.service.name) · \(store.isLoaded(account.id) ? "connected" : "not loaded")"
+                    + (account.isMuted ? " · notifications muted" : ""),
                 keywords: [account.service.name.lowercased(), "account"],
                 kind: .action(title: "Remove…") { confirmRemove(account, store) })
         }
