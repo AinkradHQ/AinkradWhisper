@@ -241,12 +241,15 @@ import WebKit
         }
         static get permission() { return 'granted' }
         static requestPermission(cb) { cb && cb('granted'); return Promise.resolve('granted') }
+        addEventListener(type, fn, o) { if (type === 'click') this.__clickListeners = (this.__clickListeners || 0) + 1; super.addEventListener(type, fn, o) }
         close() {}
       }
       window.Notification = N;
+      // True only when the web app's own click handling ran; a notification
+      // it never listened to must fall through to opening the chat by name.
       window.__whisperClick = id => {
         const n = notes.get(id);
-        if (!n) return false;
+        if (!n || !(n.onclick || n.__clickListeners)) return false;
         notes.delete(id);
         const e = new Event('click', { cancelable: true });
         try { n.onclick && n.onclick.call(n, e) } catch (_) {}
