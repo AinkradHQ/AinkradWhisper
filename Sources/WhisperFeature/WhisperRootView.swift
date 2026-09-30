@@ -16,7 +16,6 @@ struct WhisperRootView: View {
 
     /// What the modal is editing.
     private enum Editor: Equatable {
-        case add
         case rename(Account)
         case addWebApp
     }
@@ -53,15 +52,22 @@ struct WhisperRootView: View {
 
     @ViewBuilder private var content: some View {
         if let account = store.accounts.first(where: { $0.id == store.selection }) {
-            if isDialogUp {
-                theme.background.frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                WhisperWebHost(store: store, account: account)
+            // AinkradCard's resting look (chamfer, surface fill, accent
+            // hairline) without its hover zoom, which would scale the chat.
+            Group {
+                if isDialogUp {
+                    theme.surface
+                } else {
+                    WhisperWebHost(store: store, account: account)
+                }
             }
+            .clipShape(ChamferShape(cut: AinkradRadius.md))
+            .background(ChamferShape(cut: AinkradRadius.md).fill(theme.surface.opacity(0.9)))
+            .overlay(ChamferShape(cut: AinkradRadius.md).strokeBorder(theme.accentSecondary.opacity(0.25), lineWidth: 1))
+            .padding([.vertical, .trailing], AinkradSpacing.sm)
         } else {
             AinkradEmptyState(icon: WhisperApp.icon, title: "No accounts yet",
-                              message: "Add Slack, Teams or WhatsApp and sign in once.",
-                              actionTitle: "Add account") { open(.add, text: "") }
+                              message: "Add Slack, Teams or WhatsApp with the + in the sidebar, then sign in once.")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
@@ -87,12 +93,22 @@ struct WhisperRootView: View {
                 .padding(.vertical, AinkradSpacing.md)
             }
             .scrollIndicators(.never)
-            AccountTile(symbol: "plus", unread: 0, isSelected: false, isDimmed: true) { open(.add, text: "") }
-                .help("Add account")
-                .accessibilityLabel("Add account")
-                .padding(.bottom, AinkradSpacing.md)
+            AinkradMenuButton(items: addItems) {
+                AccountTile(symbol: "plus", unread: 0, isSelected: false, isDimmed: true, onTap: nil)
+            }
+            .help("Add account")
+            .accessibilityLabel("Add account")
+            .padding(.bottom, AinkradSpacing.md)
         }
         .frame(width: 60)
+    }
+
+    private var addItems: [AinkradMenuItem] {
+        [Service.slack, .teams, .whatsapp].map { service in
+            AinkradMenuItem(title: service.name, systemName: service.icon) {
+                store.add(Account(service: service, label: store.freshLabel(for: service)))
+            }
+        } + [AinkradMenuItem(title: "Other web app…", systemName: Service.custom.icon) { open(.addWebApp, text: "https://") }]
     }
 
     private func menu(for account: Account) -> [AinkradMenuItem] {
@@ -118,7 +134,6 @@ struct WhisperRootView: View {
 
     @ViewBuilder private var editorForm: some View {
         switch editor {
-        case .add: addForm
         case .rename(let account):
             textForm(title: "Rename account", subtitle: "How it is listed in the sidebar.", placeholder: "Name",
                      action: "Save", enabled: !editorText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) {
@@ -130,31 +145,6 @@ struct WhisperRootView: View {
                 if let url = webAppURL { store.add(Account(service: .custom, label: url.host ?? "Web", customURL: url)) }
             }
         case nil: EmptyView()
-        }
-    }
-
-    private var addForm: some View {
-        VStack(alignment: .leading, spacing: AinkradSpacing.md) {
-            AinkradSectionHeader(title: "Add account", subtitle: "Sign in once inside Whisper; it stays signed in.")
-            VStack(spacing: AinkradSpacing.xs) {
-                ForEach([Service.slack, .teams, .whatsapp], id: \.self) { service in
-                    AinkradListRow(onTap: {
-                                       store.add(Account(service: service, label: store.freshLabel(for: service)))
-                                       editor = nil
-                                   },
-                                   leading: { AinkradIconGlyph(systemName: service.icon) },
-                                   title: service.name,
-                                   trailing: { EmptyView() })
-                }
-                AinkradListRow(onTap: { open(.addWebApp, text: "https://") },
-                               leading: { AinkradIconGlyph(systemName: Service.custom.icon) },
-                               title: "Other web app", subtitle: "By its https:// address",
-                               trailing: { EmptyView() })
-            }
-            HStack {
-                Spacer()
-                AinkradButton(title: "Cancel", style: .ghost) { editor = nil }
-            }
         }
     }
 
@@ -185,7 +175,8 @@ private struct AccountTile: View {
     let unread: Int
     let isSelected: Bool
     let isDimmed: Bool
-    let onTap: () -> Void
+    /// Nil when the tile is another control's label (the + menu button).
+    let onTap: (() -> Void)?
 
     @State private var hovering = false
     @Environment(\.ainkradTheme) private var theme
@@ -227,10 +218,19 @@ private struct AccountTile: View {
             .scaleEffect(hovering && !isSelected && !reduceMotion ? 1.06 : 1)
             .contentShape(Rectangle())
             .onHover { hovering = $0 }
-            .onTapGesture(perform: onTap)
+            .modifier(TapIfSet(action: onTap))
             .animation(reduceMotion ? nil : AinkradMotion.hover, value: hovering)
             .animation(reduceMotion ? nil : AinkradMotion.hover, value: isSelected)
             .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+    }
+}
+
+/// Attaches a tap only when there is one, so a tile used as a button's label
+/// leaves the click to that button.
+private struct TapIfSet: ViewModifier {
+    let action: (() -> Void)?
+    func body(content: Content) -> some View {
+        if let action { content.onTapGesture(perform: action) } else { content }
     }
 }
 
