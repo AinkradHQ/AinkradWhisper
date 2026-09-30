@@ -200,10 +200,16 @@ import WebKit
             if actionTokens.count > 50 { signals.removeActionHandler(actionTokens.removeFirst().token) }
             actions = [SignalAction(id: actionID, label: "Mark as read")]
         }
-        signals.emit(kind: note.isCall ? "whisper.call" : "whisper.message", severity: .info,
+        // A person wrote to you: `.urgent` is the host's "interrupt where the
+        // user is" (a toast when Ainkrad is in front, a banner and sound when
+        // not). `.info` + `.normal` routes to the feed only, so messages
+        // arrived silently. The user's Signal rules (mute, quiet hours, Focus)
+        // still apply on top. Calls are `.warning` too, so they stand apart.
+        signals.emit(kind: note.isCall ? "whisper.call" : "whisper.message",
+                     severity: note.isCall ? .warning : .info,
                      title: note.title.isEmpty ? account.label : "\(account.label) · \(note.title)",
                      body: note.body.isEmpty ? nil : note.body,
-                     importance: note.isCall ? .urgent : .normal,
+                     importance: .urgent,
                      deepLink: SignalDeepLink(appID: WhisperApp.id, payload: payload),
                      actions: actions,
                      dedupeKey: note.isCall ? nil : note.groupKey(account: id))
