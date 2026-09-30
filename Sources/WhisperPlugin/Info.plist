@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key><string>com.ainkrad.plugin.whisper</string>
+    <key>CFBundleName</key><string>WhisperPlugin</string>
+    <!-- REQUIRED: the host renames an installed bundle to <appID>.bundle, so
+         this must be set explicitly or the bundle won't load. -->
+    <key>CFBundleExecutable</key><string>WhisperPlugin</string>
+    <key>CFBundlePackageType</key><string>BNDL</string>
+    <key>NSPrincipalClass</key><string>WhisperPluginEntryPoint</string>
+    <key>AinkradAppID</key><string>whisper</string>
+    <key>AinkradDisplayName</key><string>Whisper</string>
+    <key>AinkradIconSymbol</key><string>bubble.left.and.bubble.right</string>
+    <key>AinkradAPIVersion</key><integer>11</integer>
+    <key>AinkradAuthor</key><string>Ahmed Elhalaby</string>
+    <key>description</key><string>Slack, Teams and WhatsApp in one place.</string>
+</dict>
+</plist>
