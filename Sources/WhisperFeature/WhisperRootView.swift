@@ -69,7 +69,7 @@ struct WhisperRootView: View {
             .padding([.vertical, .trailing], AinkradSpacing.sm)
         } else {
             AinkradEmptyState(icon: WhisperApp.icon, title: "No accounts yet",
-                              message: "Add Slack, Teams or WhatsApp with the + in the sidebar, then sign in once.")
+                              message: "Add Slack, Teams, WhatsApp or Google Meet with the + in the sidebar, then sign in once.")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
@@ -106,7 +106,7 @@ struct WhisperRootView: View {
     }
 
     private var addItems: [AinkradMenuItem] {
-        [Service.slack, .teams, .whatsapp].map { service in
+        [Service.slack, .teams, .whatsapp, .meet].map { service in
             AinkradMenuItem(title: service.name, systemName: service.icon) {
                 store.add(Account(service: service, label: store.freshLabel(for: service)))
             }

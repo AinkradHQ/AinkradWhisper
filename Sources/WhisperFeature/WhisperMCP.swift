@@ -55,7 +55,7 @@ import AinkradAppKit
             return failure("Unknown account. Call list_accounts and pass a label or id.")
         }
         guard let script = ServiceScripts.script(operation, for: account.service) else {
-            return failure("\(account.label) is a custom web account; the assistant tools cover Slack, Teams and WhatsApp.")
+            return failure("\(account.label) (\(account.service.name)) has no chats for the assistant; the tools cover Slack, Teams and WhatsApp.")
         }
         var arguments: [String: Any] = ["limit": min(max(input["limit"] as? Int ?? 30, 1), 200)]
         for key in operation.required {

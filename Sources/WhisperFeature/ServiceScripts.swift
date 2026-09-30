@@ -25,7 +25,7 @@ enum ServiceScripts {
         case .slack: common + slack + slackBody(operation)
         case .teams: common + teams + teamsBody(operation)
         case .whatsapp: common + whatsapp + whatsappBody(operation)
-        case .custom: nil
+        case .meet, .custom: nil
         }
     }
 

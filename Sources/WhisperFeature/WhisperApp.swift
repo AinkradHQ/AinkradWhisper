@@ -52,7 +52,7 @@ public struct WhisperApp: AinkradApp {
                 SettingsGroup(path: general, title: "General", fields: [
                     SettingsField(
                         path: general.appending("hibernate"), label: "Hibernate idle accounts",
-                        help: "Frees Slack and Teams after this long unseen. WhatsApp stays connected.",
+                        help: "Frees Slack, Teams and Meet after this long unseen. WhatsApp stays connected.",
                         keywords: ["hibernate", "memory", "idle", "sleep"],
                         kind: .select(
                             options: [0, 5, 15, 30, 60].map {
@@ -74,7 +74,7 @@ public struct WhisperApp: AinkradApp {
             SettingsField(
                 path: group.appending("new-service"), label: "Add account",
                 help: "Sign in inside Whisper once it is added.",
-                keywords: ["add", "slack", "teams", "whatsapp"],
+                keywords: ["add", "slack", "teams", "whatsapp", "meet", "google"],
                 kind: .select(options: Service.allCases.map { SettingsOption(id: $0.rawValue, title: $0.name) },
                               selection: Binding(get: { draft.service.rawValue },
                                                  set: { draft.service = Service(rawValue: $0) ?? .slack }))),

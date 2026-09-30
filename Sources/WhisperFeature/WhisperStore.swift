@@ -169,7 +169,7 @@ import WebKit
         guard hibernateMinutes > 0 else { return }
         let cutoff = now.addingTimeInterval(-Double(hibernateMinutes) * 60)
         for (id, page) in pages where page.account.service.hibernates
-            && page.webView.window === parking && page.lastUsed < cutoff {
+            && page.webView.window === parking && page.lastUsed < cutoff && !page.isInCall {
             pages.removeValue(forKey: id)?.close()
             unread[id] = nil
         }

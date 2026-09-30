@@ -1,13 +1,14 @@
 import Foundation
 
 public enum Service: String, Codable, CaseIterable, Sendable {
-    case slack, teams, whatsapp, custom
+    case slack, teams, whatsapp, meet, custom
 
     var name: String {
         switch self {
         case .slack: "Slack"
         case .teams: "Teams"
         case .whatsapp: "WhatsApp"
+        case .meet: "Google Meet"
         case .custom: "Web"
         }
     }
@@ -17,6 +18,7 @@ public enum Service: String, Codable, CaseIterable, Sendable {
         case .slack: "number"
         case .teams: "person.3"
         case .whatsapp: "phone.bubble"
+        case .meet: "video"
         case .custom: "globe"
         }
     }
@@ -26,6 +28,7 @@ public enum Service: String, Codable, CaseIterable, Sendable {
         case .slack: URL(string: "https://app.slack.com/client")
         case .teams: URL(string: "https://teams.microsoft.com/v2/")
         case .whatsapp: URL(string: "https://web.whatsapp.com")
+        case .meet: URL(string: "https://meet.google.com")
         case .custom: nil
         }
     }
@@ -39,12 +42,14 @@ public enum Service: String, Codable, CaseIterable, Sendable {
         case .teams: ["microsoft.com", "microsoftonline.com", "live.com", "office.com",
                       "office.net", "cloud.microsoft", "skype.com", "sharepoint.com"]
         case .whatsapp: ["whatsapp.com", "whatsapp.net"]
+        // Meet plus Google sign-in and the static hosts its call UI loads from.
+        case .meet: ["google.com", "gstatic.com", "googleusercontent.com", "googleapis.com"]
         case .custom: []
         }
     }
 
-    /// Slack and Teams reload fast and their assistant paths reload on demand;
-    /// WhatsApp must stay loaded to keep receiving (its session is the page).
+    /// Slack, Teams and Meet reload fast (and Meet has nothing to receive
+    /// between calls); WhatsApp must stay loaded to keep receiving.
     var hibernates: Bool { self != .whatsapp }
 }
 

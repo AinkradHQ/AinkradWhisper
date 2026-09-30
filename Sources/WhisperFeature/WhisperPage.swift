@@ -47,6 +47,10 @@ import WebKit
         if let url = account.url { webView.load(URLRequest(url: url)) }
     }
 
+    /// A call is live while the page holds the camera or microphone; such a
+    /// page must never hibernate, or switching accounts would hang up.
+    var isInCall: Bool { webView.cameraCaptureState != .none || webView.microphoneCaptureState != .none }
+
     func close() {
         popups.forEach { $0.close() }
         popups.removeAll()
