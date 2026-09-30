@@ -33,23 +33,24 @@ struct WhisperRootView: View {
         }
     }
 
+    /// The + follows the last tile rather than sitting at the window's
+    /// bottom: the kit's floating panel opens downward unless the SCREEN runs
+    /// out of room, so a + at the bottom of the pane dropped its menu outside the app.
+    // ponytail: with enough accounts to push + near the bottom this recurs; the real fix is window-aware placement in AinkradFloatingPanel.
     private var rail: some View {
-        VStack(spacing: AinkradSpacing.sm) {
-            ScrollView {
-                VStack(spacing: AinkradSpacing.sm) {
-                    ForEach(store.accounts) { account in
-                        AccountTile(account: account, unread: store.unread[account.id] ?? 0,
-                                    isSelected: account.id == store.selection,
-                                    isLoaded: store.isLoaded(account.id)) { store.selection = account.id }
-                            .ainkradContextMenu(menu(for: account))
-                    }
+        ScrollView {
+            VStack(spacing: AinkradSpacing.sm) {
+                ForEach(store.accounts) { account in
+                    AccountTile(account: account, unread: store.unread[account.id] ?? 0,
+                                isSelected: account.id == store.selection,
+                                isLoaded: store.isLoaded(account.id)) { store.selection = account.id }
+                        .ainkradContextMenu(menu(for: account))
                 }
-                .padding(.vertical, AinkradSpacing.sm)
+                AinkradMenuButton(items: addItems) { AddTile() }
             }
-            .scrollIndicators(.never)
-            AinkradMenuButton(items: addItems) { AddTile() }
-                .padding(.bottom, AinkradSpacing.md)
+            .padding(.vertical, AinkradSpacing.sm)
         }
+        .scrollIndicators(.never)
         .frame(width: 60)
     }
 
