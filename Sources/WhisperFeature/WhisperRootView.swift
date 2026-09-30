@@ -12,6 +12,7 @@ struct WhisperRootView: View {
     @State private var editorText = ""
     @State private var removing: Account?
     @Environment(\.ainkradTheme) private var theme
+    @Environment(\.ainkradReduceMotion) private var reduceMotion
 
     /// What the modal is editing.
     private enum Editor: Equatable {
@@ -65,34 +66,56 @@ struct WhisperRootView: View {
         }
     }
 
-    /// Same shape as Quest's project sidebar: a section header, kit list
-    /// rows, row actions in the context menu, the add action in the footer.
+    /// Quest's sidebar shape (kit list rows, row actions in the context
+    /// menu, add in the footer), collapsible to icons so it costs ~60pt.
     private var sidebar: some View {
-        VStack(alignment: .leading, spacing: AinkradSpacing.sm) {
-            AinkradSectionHeader(title: "Accounts")
+        let expanded = store.sidebarExpanded
+        return VStack(alignment: expanded ? .leading : .center, spacing: AinkradSpacing.sm) {
+            HStack(spacing: AinkradSpacing.xs) {
+                if expanded { AinkradSectionHeader(title: "Accounts"); Spacer(minLength: 0) }
+                AinkradIconButton(systemName: "sidebar.left", size: 13,
+                                  tooltip: expanded ? "Collapse sidebar" : "Expand sidebar") {
+                    store.sidebarExpanded.toggle()
+                }
+            }
             ScrollView {
                 LazyVStack(spacing: AinkradSpacing.xs) {
-                    ForEach(store.accounts) { account in
-                        let unread = store.unread[account.id] ?? 0
-                        AinkradListRow(isSelected: account.id == store.selection,
-                                       onTap: { store.selection = account.id },
-                                       leading: { AinkradIconGlyph(systemName: account.service.icon) },
-                                       title: account.label,
-                                       subtitle: store.isLoaded(account.id) ? account.service.name
-                                                                             : "\(account.service.name) · hibernated",
-                                       trailing: {
-                                           if unread > 0 { AinkradBadge(text: unread > 99 ? "99+" : "\(unread)", status: .danger) }
-                                       })
-                            .ainkradContextMenu(menu(for: account))
-                    }
+                    ForEach(store.accounts) { account in row(account, expanded: expanded) }
                 }
             }
             .scrollIndicators(.never)
             Spacer(minLength: 0)
-            AinkradButton(title: "Add account", style: .secondary, icon: "plus") { open(.add, text: "") }
+            if expanded {
+                AinkradButton(title: "Add account", style: .secondary, icon: "plus") { open(.add, text: "") }
+            } else {
+                AinkradIconButton(systemName: "plus", size: 14, tooltip: "Add account") { open(.add, text: "") }
+            }
         }
-        .padding(AinkradSpacing.md)
-        .frame(width: 220)
+        .padding(expanded ? AinkradSpacing.md : AinkradSpacing.sm)
+        .frame(width: expanded ? 164 : 60)
+        .animation(reduceMotion ? nil : AinkradMotion.present, value: expanded)
+    }
+
+    private func row(_ account: Account, expanded: Bool) -> some View {
+        let unread = store.unread[account.id] ?? 0
+        let status = store.isLoaded(account.id) ? account.service.name : "\(account.service.name) · hibernated"
+        let badge = unread > 99 ? "99+" : "\(unread)"
+        return AinkradListRow(
+            isSelected: account.id == store.selection,
+            onTap: { store.selection = account.id },
+            leading: {
+                AinkradIconGlyph(systemName: account.service.icon)
+                    .overlay(alignment: .topTrailing) {
+                        if !expanded && unread > 0 {
+                            AinkradBadge(text: badge, status: .danger).fixedSize().scaleEffect(0.8).offset(x: 12, y: -10)
+                        }
+                    }
+            },
+            title: expanded ? account.label : "",
+            subtitle: expanded ? status : nil,
+            trailing: { if expanded && unread > 0 { AinkradBadge(text: badge, status: .danger) } })
+            .help("\(account.label) · \(status)")
+            .ainkradContextMenu(menu(for: account))
     }
 
     private func menu(for account: Account) -> [AinkradMenuItem] {
