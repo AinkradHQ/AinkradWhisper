@@ -205,12 +205,19 @@ import WebKit
         // not). `.info` + `.normal` routes to the feed only, so messages
         // arrived silently. The user's Signal rules (mute, quiet hours, Focus)
         // still apply on top. Calls are `.warning` too, so they stand apart.
+        // The service is the link's symbol (the toast draws it beside the
+        // title), so the title is just the sender. The account's own name is
+        // added only when two accounts share a service, e.g. two Slacks.
+        var link = SignalDeepLink(appID: WhisperApp.id, payload: payload)
+        link.symbol = account.service.icon
+        let shared = accounts.filter { $0.service == account.service }.count > 1
+        let sender = note.title.isEmpty ? account.label : note.title
         signals.emit(kind: note.isCall ? "whisper.call" : "whisper.message",
                      severity: note.isCall ? .warning : .info,
-                     title: note.title.isEmpty ? account.label : "\(account.label) · \(note.title)",
+                     title: shared ? "\(sender) · \(account.label)" : sender,
                      body: note.body.isEmpty ? nil : note.body,
                      importance: .urgent,
-                     deepLink: SignalDeepLink(appID: WhisperApp.id, payload: payload),
+                     deepLink: link,
                      actions: actions,
                      dedupeKey: note.isCall ? nil : note.groupKey(account: id))
     }
