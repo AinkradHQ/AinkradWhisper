@@ -198,7 +198,9 @@ import WebKit
             let token = signals.handleAction(actionID) { [weak self] in await self?.markRead(target) }
             actionTokens.append((actionID, token))
             if actionTokens.count > 50 { signals.removeActionHandler(actionTokens.removeFirst().token) }
-            actions = [SignalAction(id: actionID, label: "Mark as read")]
+            var markRead = SignalAction(id: actionID, label: "Mark as read")
+            markRead.symbol = "checkmark.circle"
+            actions = [markRead]
         }
         // A person wrote to you: `.urgent` is the host's "interrupt where the
         // user is" (a toast when Ainkrad is in front, a banner and sound when
