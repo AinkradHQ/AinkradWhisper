@@ -17,9 +17,9 @@ packages:
     # At or behind the host's pin, never ahead: the host embeds the one dynamic
     # copy of the SDK and a newer pin links symbols it does not define. See the
     # long comment in AinkradQuest/project.yml for why "behind" is not free either.
-    # 9b44535: AinkradMenuButton placement (#51) and SignalDeepLink.symbol, for
-    # the service icon on toasts. Needs a host at 9b44535 or later.
-    revision: 9b445358a739e891e45c28e8d5077a0660f24599
+    # 97c489b: AinkradMenuButton placement (#51) and SignalDeepLink.symbol, for
+    # the service icon on toasts. Needs a host at 97c489b or later.
+    revision: 97c489b0c72bdbb976e9f49ecc68b1c6d1614496
 targets:
   WhisperFeature:
     type: library.static
