@@ -38,6 +38,13 @@ import WebKit
             hibernateMinutes = state.hibernateMinutes
         }
         selection = accounts.first?.id
+        // Kept-connected accounts must be live to notify, pane open or not.
+        // Deferred, so building the store (MCP listing, Settings) stays cheap
+        // and launch is not held up by three web clients loading at once.
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(3))
+            self?.connectKeptAccounts()
+        }
     }
 
     public var totalUnread: Int { unread.values.reduce(0, +) }
@@ -178,13 +185,14 @@ import WebKit
         }
     }
 
-    /// Frees Slack and Teams pages nobody has looked at for a while. The data
-    /// store keeps the login, so selecting the account reloads it signed in.
+    /// Frees pages nobody has looked at for a while, except accounts kept
+    /// connected. The data store keeps the login, so selecting the account
+    /// reloads it signed in.
     // ponytail: a hibernated account shows no unread count; add a light background poll if missed messages hurt.
     func hibernateIdle(now: Date = Date()) {
         guard hibernateMinutes > 0 else { return }
         let cutoff = now.addingTimeInterval(-Double(hibernateMinutes) * 60)
-        for (id, page) in pages where page.account.service.hibernates
+        for (id, page) in pages where !(accounts.first { $0.id == id }?.staysConnected ?? true)
             && page.webView.window === parking && page.lastUsed < cutoff && !page.isInCall {
             pages.removeValue(forKey: id)?.close()
             unread[id] = nil
@@ -288,6 +296,17 @@ import WebKit
            accounts.contains(where: { $0.id == target.account }) { return target }
         guard let id = UUID(uuidString: payload), accounts.contains(where: { $0.id == id }) else { return nil }
         return NotificationTarget(account: id, note: "", chat: "")
+    }
+
+    func connectKeptAccounts() {
+        for account in accounts where account.staysConnected { _ = page(for: account) }
+    }
+
+    public func setKeepConnected(_ id: UUID, _ keep: Bool) {
+        guard let index = accounts.firstIndex(where: { $0.id == id }) else { return }
+        accounts[index].keepConnected = keep == accounts[index].service.connectedByDefault ? nil : keep
+        save()
+        if keep { _ = page(for: accounts[index]) }
     }
 
     public func setMuted(_ id: UUID, _ muted: Bool) {

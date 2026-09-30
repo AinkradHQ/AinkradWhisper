@@ -48,9 +48,14 @@ public enum Service: String, Codable, CaseIterable, Sendable {
         }
     }
 
-    /// Slack, Teams and Meet reload fast (and Meet has nothing to receive
-    /// between calls); WhatsApp must stay loaded to keep receiving.
-    var hibernates: Bool { self != .whatsapp }
+    /// WhatsApp cannot hibernate: its session is the page, and a reload means
+    /// re-syncing. Everything else can, at the cost of its notifications.
+    var canHibernate: Bool { self != .whatsapp }
+
+    /// Whether a new account of this service stays connected by default:
+    /// the chat services, because a hibernated page receives nothing, so it
+    /// cannot notify. Meet and web apps have nothing to wait for.
+    var connectedByDefault: Bool { self == .slack || self == .teams || self == .whatsapp }
 }
 
 public struct Account: Codable, Identifiable, Equatable, Sendable {
@@ -63,6 +68,14 @@ public struct Account: Codable, Identifiable, Equatable, Sendable {
     public var muted: Bool?
 
     var isMuted: Bool { muted == true }
+
+    /// Nil means the service's default (`connectedByDefault`); optional so
+    /// accounts saved before this existed still decode.
+    public var keepConnected: Bool?
+
+    /// Never hibernates, and connects when Ainkrad starts, so it keeps
+    /// receiving and notifying.
+    var staysConnected: Bool { !service.canHibernate || (keepConnected ?? service.connectedByDefault) }
 
     var url: URL? { customURL ?? service.defaultURL }
 

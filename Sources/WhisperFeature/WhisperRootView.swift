@@ -82,6 +82,7 @@ struct WhisperRootView: View {
                         let unread = store.unread[account.id] ?? 0
                         let status = (store.isLoaded(account.id) ? account.service.name
                                                                  : "\(account.service.name) · hibernated")
+                            + (account.service.canHibernate && account.staysConnected ? " · kept connected" : "")
                             + (account.isMuted ? " · muted" : "")
                         AccountTile(symbol: account.service.icon, unread: unread,
                                     isSelected: account.id == store.selection,
@@ -125,6 +126,11 @@ struct WhisperRootView: View {
             account.isMuted
                 ? AinkradMenuItem(title: "Unmute notifications", systemName: "bell") { store.setMuted(account.id, false) }
                 : AinkradMenuItem(title: "Mute notifications", systemName: "bell.slash") { store.setMuted(account.id, true) },
+        ] + (account.service.canHibernate ? [
+            account.staysConnected
+                ? AinkradMenuItem(title: "Let it hibernate when idle", systemName: "moon.zzz") { store.setKeepConnected(account.id, false) }
+                : AinkradMenuItem(title: "Keep connected", systemName: "bolt.horizontal") { store.setKeepConnected(account.id, true) },
+        ] : []) + [
             AinkradMenuItem(title: "Remove…", systemName: "trash", isDestructive: true) { removing = account },
         ]
     }

@@ -40,7 +40,9 @@ public struct WhisperApp: AinkradApp {
             SettingsField(
                 path: accounts.appending(account.id.uuidString), label: account.label,
                 help: "\(account.service.name) · \(store.isLoaded(account.id) ? "connected" : "not loaded")"
-                    + (account.isMuted ? " · notifications muted" : ""),
+                    + (account.isMuted ? " · notifications muted" : "")
+                    + (account.service.canHibernate
+                        ? (account.staysConnected ? " · kept connected" : " · hibernates when idle, no notifications meanwhile") : ""),
                 keywords: [account.service.name.lowercased(), "account"],
                 kind: .action(title: "Remove…") { confirmRemove(account, store) })
         }
@@ -53,7 +55,7 @@ public struct WhisperApp: AinkradApp {
                 SettingsGroup(path: general, title: "General", fields: [
                     SettingsField(
                         path: general.appending("hibernate"), label: "Hibernate idle accounts",
-                        help: "Frees Slack, Teams and Meet after this long unseen. WhatsApp stays connected.",
+                        help: "Frees accounts you have not kept connected after this long unseen; they stop notifying until opened. Right-click an account to keep it connected.",
                         keywords: ["hibernate", "memory", "idle", "sleep"],
                         kind: .select(
                             options: [0, 5, 15, 30, 60].map {

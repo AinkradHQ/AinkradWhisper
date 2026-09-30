@@ -45,4 +45,13 @@ final class TitleBadgeTests: XCTestCase {
         let account = try JSONDecoder().decode(Account.self, from: Data(old.utf8))
         XCTAssertFalse(account.isMuted)
     }
+
+    func testKeepConnectedDefaults() {
+        XCTAssertTrue(Account(service: .whatsapp, label: "W", keepConnected: false).staysConnected, "WhatsApp cannot hibernate")
+        XCTAssertTrue(Account(service: .slack, label: "S").staysConnected)
+        XCTAssertTrue(Account(service: .teams, label: "T").staysConnected)
+        XCTAssertFalse(Account(service: .meet, label: "M").staysConnected)
+        XCTAssertFalse(Account(service: .slack, label: "S", keepConnected: false).staysConnected)
+        XCTAssertTrue(Account(service: .meet, label: "M", keepConnected: true).staysConnected)
+    }
 }
