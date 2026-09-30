@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key><string>com.example.plugin.myplugin</string>
+    <key>CFBundleName</key><string>TemplatePlugin</string>
+    <!-- REQUIRED: the host renames an installed bundle to <appID>.bundle, so
+         this must be set explicitly or the bundle won't load. -->
+    <key>CFBundleExecutable</key><string>TemplatePlugin</string>
+    <key>CFBundlePackageType</key><string>BNDL</string>
+    <key>NSPrincipalClass</key><string>MyPluginEntryPoint</string>
+    <key>AinkradAppID</key><string>myplugin</string>
+    <key>AinkradDisplayName</key><string>My Plugin</string>
+    <key>AinkradIconSymbol</key><string>puzzlepiece.extension</string>
+    <key>AinkradAPIVersion</key><integer>8</integer>
+    <key>AinkradAuthor</key><string>Your Name</string>
+    <key>description</key><string>A short description of what this app does.</string>
+</dict>
+</plist>
