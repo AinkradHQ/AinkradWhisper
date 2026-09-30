@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import AinkradAppKit
 
-/// The account rail and the selected account's live web client.
+/// A slim account rail and the selected account's live web client.
 struct WhisperRootView: View {
     let store: WhisperStore
     let launcher: PluginAppLauncher
@@ -10,18 +10,16 @@ struct WhisperRootView: View {
     @Environment(\.ainkradTheme) private var theme
 
     var body: some View {
-        Group {
+        HStack(spacing: 0) {
+            rail
             if let account = store.accounts.first(where: { $0.id == store.selection }) {
-                HStack(spacing: 0) {
-                    rail
-                    WhisperWebHost(store: store, account: account)
-                        .clipShape(ChamferShape(cut: AinkradRadius.md))
-                        .padding([.vertical, .trailing], AinkradSpacing.sm)
-                }
+                WhisperWebHost(store: store, account: account)
+                    .clipShape(RoundedRectangle(cornerRadius: AinkradRadius.md, style: .continuous))
+                    .padding([.vertical, .trailing], AinkradSpacing.sm)
             } else {
                 AinkradEmptyState(icon: WhisperApp.icon, title: "No accounts yet",
-                                  message: "Add Slack, Teams or WhatsApp and sign in once. Add more, and rename them, in Settings.")
-                    .overlay(alignment: .bottom) { quickAdd.padding(.bottom, AinkradSpacing.xxl) }
+                                  message: "Add Slack, Teams or WhatsApp with the + in the rail, then sign in once.")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -36,34 +34,58 @@ struct WhisperRootView: View {
     }
 
     private var rail: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 1) {
-                ForEach(store.accounts) { account in
-                    AccountRow(account: account, unread: store.unread[account.id] ?? 0,
-                               isSelected: account.id == store.selection,
-                               isLoaded: store.isLoaded(account.id)) { store.selection = account.id }
+        VStack(spacing: AinkradSpacing.sm) {
+            ScrollView {
+                VStack(spacing: AinkradSpacing.sm) {
+                    ForEach(store.accounts) { account in
+                        AccountTile(account: account, unread: store.unread[account.id] ?? 0,
+                                    isSelected: account.id == store.selection,
+                                    isLoaded: store.isLoaded(account.id)) { store.selection = account.id }
+                            .ainkradContextMenu(menu(for: account))
+                    }
                 }
+                .padding(.vertical, AinkradSpacing.sm)
             }
-            .padding(AinkradSpacing.xs + 2)
+            .scrollIndicators(.never)
+            AinkradMenuButton(items: addItems) { AddTile() }
+                .padding(.bottom, AinkradSpacing.md)
         }
-        .scrollIndicators(.never)
-        .frame(width: 176)
+        .frame(width: 60)
     }
 
-    private var quickAdd: some View {
-        HStack(spacing: AinkradSpacing.sm) {
-            ForEach([Service.slack, .teams, .whatsapp], id: \.self) { service in
-                AinkradButton(title: service.name, style: .secondary, icon: service.icon) {
-                    store.add(Account(service: service, label: service.name))
-                }
+    private var addItems: [AinkradMenuItem] {
+        [Service.slack, .teams, .whatsapp].map { service in
+            AinkradMenuItem(title: service.name, systemName: service.icon) {
+                store.add(Account(service: service, label: store.freshLabel(for: service)))
             }
-        }
+        } + [AinkradMenuItem(title: "Other web app…", systemName: Service.custom.icon) { addCustom() }]
+    }
+
+    private func menu(for account: Account) -> [AinkradMenuItem] {
+        [
+            AinkradMenuItem(title: "Rename…", systemName: "pencil") {
+                if let name = Prompt.text("Rename \(account.label)", value: account.label) {
+                    store.rename(account.id, to: name)
+                }
+            },
+            AinkradMenuItem(title: "Reload", systemName: "arrow.clockwise") { store.reload(account.id) },
+            AinkradMenuItem(title: "Remove…", systemName: "trash", isDestructive: true) {
+                WhisperApp.confirmRemove(account, store)
+            },
+        ]
+    }
+
+    private func addCustom() {
+        guard let raw = Prompt.text("Add a web app", message: "Its https:// address, e.g. https://chat.example.com"),
+              let url = URL(string: raw.trimmingCharacters(in: .whitespacesAndNewlines)),
+              url.scheme == "https", let host = url.host else { return }
+        store.add(Account(service: .custom, label: host, customURL: url))
     }
 }
 
-/// One rail row; owns its hover so rows light up one at a time. Same shape as
-/// the SDK's `SignalSourceRail` row: chamfered fill, an accent edge, no rules.
-private struct AccountRow: View {
+/// One account: a monogram tile with an unread badge. The name is in the
+/// tooltip, so two Slack workspaces read "A" and "B", not "Slack" twice.
+private struct AccountTile: View {
     let account: Account
     let unread: Int
     let isSelected: Bool
@@ -75,42 +97,92 @@ private struct AccountRow: View {
     @Environment(\.ainkradTypography) private var typo
     @Environment(\.ainkradReduceMotion) private var reduceMotion
 
-    private var fillOpacity: Double { isSelected ? 0.9 : (isHovered ? 0.45 : 0) }
+    private var tint: Color {
+        switch account.service {
+        case .slack: theme.accentPrimary
+        case .teams: theme.accentSecondary
+        case .whatsapp: theme.accentTertiary
+        case .custom: theme.foreground
+        }
+    }
 
     var body: some View {
         Button(action: onSelect) {
-            HStack(spacing: AinkradSpacing.sm) {
-                Image(systemName: account.service.icon)
-                    .frame(width: 16)
-                    .foregroundStyle(isSelected ? theme.accentSecondary : theme.foreground.opacity(isLoaded ? 0.72 : 0.4))
-                Text(account.label)
-                    .font(AinkradFontResolver.font(.body, weight: isSelected ? .semibold : .regular, typography: typo))
-                    .foregroundStyle(theme.foreground.opacity(isSelected ? 1 : (isHovered ? 0.9 : 0.72)))
-                    .lineLimit(1)
-                Spacer(minLength: AinkradSpacing.xs)
-                if unread > 0 {
-                    AinkradBadge(text: unread > 99 ? "99+" : "\(unread)", tint: theme.accentPrimary)
+            Text(String(account.label.prefix(1)).uppercased())
+                .font(AinkradFontResolver.font(.headline, weight: .semibold, typography: typo))
+                .foregroundStyle(isSelected ? theme.foreground : theme.foreground.opacity(isLoaded ? 0.85 : 0.5))
+                .frame(width: 38, height: 38)
+                .background(
+                    RoundedRectangle(cornerRadius: AinkradRadius.sm, style: .continuous)
+                        .fill(tint.opacity(isSelected ? 0.55 : (isHovered ? 0.35 : 0.2))))
+                .overlay(alignment: .bottomTrailing) {
+                    Image(systemName: account.service.icon)
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(theme.foreground.opacity(0.8))
+                        .frame(width: 15, height: 15)
+                        .background(Circle().fill(theme.surfaceElevated))
+                        .offset(x: 4, y: 4)
                 }
-            }
-            .padding(.horizontal, AinkradSpacing.sm)
-            .padding(.vertical, AinkradSpacing.xs + 2)
-            .background(ChamferShape(cut: AinkradRadius.sm).fill(theme.surfaceElevated.opacity(fillOpacity)))
-            .overlay(alignment: .leading) {
-                Capsule().fill(theme.accentSecondary)
-                    .frame(width: 2)
-                    .padding(.vertical, 5)
-                    .scaleEffect(y: isSelected ? 1 : 0, anchor: .center)
-                    .opacity(isSelected ? 1 : 0)
-            }
-            .contentShape(ChamferShape(cut: AinkradRadius.sm))
+                .overlay(alignment: .topTrailing) {
+                    if unread > 0 {
+                        AinkradBadge(text: unread > 99 ? "99+" : "\(unread)", tint: theme.accentPrimary)
+                            .fixedSize()
+                            .offset(x: 8, y: -6)
+                    }
+                }
+                .scaleEffect(isHovered && !isSelected ? 1.05 : 1)
+                .frame(maxWidth: .infinity)
+                .overlay(alignment: .leading) {
+                    Capsule().fill(theme.accentSecondary)
+                        .frame(width: 3, height: isSelected ? 22 : (isHovered ? 8 : 0))
+                        .opacity(isSelected || isHovered ? 1 : 0)
+                }
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .animation(reduceMotion ? nil : AinkradMotion.hover, value: isHovered)
         .animation(reduceMotion ? nil : AinkradMotion.hover, value: isSelected)
         .onHover { isHovered = $0 }
-        .help(isLoaded ? account.service.name : "\(account.service.name) · hibernated, loads when opened")
-        .accessibilityLabel("\(account.label), \(unread > 0 ? "\(unread) unread" : "nothing unread")")
+        .help(isLoaded ? "\(account.label) · \(account.service.name)"
+                       : "\(account.label) · \(account.service.name) · hibernated, loads when opened")
+        .accessibilityLabel("\(account.label), \(account.service.name), \(unread > 0 ? "\(unread) unread" : "nothing unread")")
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+    }
+}
+
+private struct AddTile: View {
+    @State private var isHovered = false
+    @Environment(\.ainkradTheme) private var theme
+    @Environment(\.ainkradReduceMotion) private var reduceMotion
+
+    var body: some View {
+        Image(systemName: "plus")
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(theme.foreground.opacity(isHovered ? 0.95 : 0.55))
+            .frame(width: 38, height: 38)
+            .background(RoundedRectangle(cornerRadius: AinkradRadius.sm, style: .continuous)
+                .fill(theme.surfaceElevated.opacity(isHovered ? 0.8 : 0.35)))
+            .contentShape(Rectangle())
+            .animation(reduceMotion ? nil : AinkradMotion.hover, value: isHovered)
+            .onHover { isHovered = $0 }
+            .help("Add an account")
+            .accessibilityLabel("Add an account")
+    }
+}
+
+/// A one-field NSAlert: enough for a rename or a URL, without a sheet stack.
+@MainActor enum Prompt {
+    static func text(_ title: String, message: String = "", value: String = "") -> String? {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = message
+        let field = NSTextField(string: value)
+        field.frame = NSRect(x: 0, y: 0, width: 280, height: 24)
+        alert.accessoryView = field
+        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: "Cancel")
+        alert.window.initialFirstResponder = field
+        return alert.runModal() == .alertFirstButtonReturn ? field.stringValue : nil
     }
 }
 
@@ -127,14 +199,6 @@ private struct WhisperWebHost: NSViewRepresentable {
     }
 
     static func dismantleNSView(_ container: NSView, coordinator: ()) {
-        MainActor.assumeIsolated { WhisperApp.detach(from: container) }
-    }
-}
-
-extension WhisperApp {
-    /// `dismantleNSView` is static and has no store; the store is process-wide anyway.
-    @MainActor static func detach(from container: NSView) {
-        guard let store = sharedStore else { return }
-        store.detach(from: container)
+        MainActor.assumeIsolated { WhisperApp.sharedStore?.detach(from: container) }
     }
 }

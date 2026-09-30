@@ -47,6 +47,23 @@ import WebKit
         save()
     }
 
+    public func rename(_ id: UUID, to label: String) {
+        let trimmed = label.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let index = accounts.firstIndex(where: { $0.id == id }) else { return }
+        accounts[index].label = trimmed
+        save()
+    }
+
+    /// A label that does not collide: "Slack", then "Slack 2", "Slack 3"…
+    func freshLabel(for service: Service) -> String {
+        let taken = Set(accounts.map(\.label))
+        var label = service.name, n = 1
+        while taken.contains(label) { n += 1; label = "\(service.name) \(n)" }
+        return label
+    }
+
+    func reload(_ id: UUID) { pages[id]?.webView.reload() }
+
     public func remove(_ id: UUID) {
         pages.removeValue(forKey: id)?.close()
         unread[id] = nil

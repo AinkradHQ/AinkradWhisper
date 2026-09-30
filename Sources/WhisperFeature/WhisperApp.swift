@@ -98,7 +98,7 @@ public struct WhisperApp: AinkradApp {
         return fields
     }
 
-    private static func confirmRemove(_ account: Account, _ store: WhisperStore) {
+    static func confirmRemove(_ account: Account, _ store: WhisperStore) {
         let alert = NSAlert()
         alert.messageText = "Remove \(account.label)?"
         alert.informativeText = "This signs Whisper out of the account and deletes its local data."
