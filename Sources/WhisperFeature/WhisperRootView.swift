@@ -221,6 +221,9 @@ private struct AccountTile: View {
                         .fixedSize()
                         .scaleEffect(0.8, anchor: .topTrailing)
                         .offset(x: 5, y: -5)
+                        // Quieter on the account you are on or pointing at:
+                        // the count is for accounts you are NOT looking at.
+                        .opacity(isSelected || hovering ? 0.45 : 1)
                 }
             }
             .overlay(alignment: .bottomTrailing) {

@@ -233,8 +233,8 @@ import WebKit
     }
 
     /// A notification click: show the account, then have its web app open
-    /// the chat, by replaying the click on the page's own notification (or,
-    /// for WhatsApp, opening the chat by name when the page no longer has it).
+    /// the chat, by replaying the click on the page's own notification, or,
+    /// when the page no longer has it, opening the conversation it named.
     func open(_ payload: String) {
         guard let target = decodeTarget(payload) else { return }
         selection = target.account
@@ -249,9 +249,8 @@ import WebKit
         guard let account = accounts.first(where: { $0.id == target.account }), !target.note.isEmpty else { return }
         let page = await loadedPage(for: account)
         if await page.clickNotification(target.note) { return }
-        if account.service == .whatsapp, !target.chat.isEmpty {
-            _ = try? await page.run(ServiceScripts.whatsappOpenChat, arguments: ["chat": target.chat])
-        }
+        guard !target.chat.isEmpty, let script = ServiceScripts.openFromNotification(account.service) else { return }
+        _ = try? await page.run(script, arguments: ["chat": target.chat, "limit": 30])
     }
 
     /// The JSON target, or a bare account id from a notification raised before targets existed.

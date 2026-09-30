@@ -29,9 +29,53 @@ enum ServiceScripts {
         }
     }
 
-    /// Opens a WhatsApp chat by name (the `chat` variable), for a
-    /// notification click whose notification the page no longer holds.
-    static var whatsappOpenChat: String { common + whatsapp + "await open(chat);\nreturn JSON.stringify(true);" }
+    /// Opens the conversation a notification named (the `chat` variable is its
+    /// title), for a click whose notification object the page no longer holds:
+    /// a service-worker notification, or one raised before the page reloaded.
+    /// Probed 2026-09-30 against each web client.
+    static func openFromNotification(_ service: Service) -> String? {
+        switch service {
+        case .whatsapp: common + whatsapp + "await open(chat);\nreturn JSON.stringify(true);"
+        case .slack: common + slack + slackOpen
+        case .teams: common + teamsOpen
+        case .meet, .custom: nil
+        }
+    }
+
+    /// Slack titles a notification "New message in <channel>" or "…from
+    /// <person>". Its own sidebar entry switches in place; a conversation that
+    /// is not in the sidebar opens by URL, which reloads the client.
+    private static let slackOpen = """
+    const name = (chat.match(/^New message (?:in|from) (.+)$/i) || [, chat])[1].trim().replace(/^[#@]/, '');
+    const want = name.toLowerCase();
+    // Channels by name first: no per-conversation lookups, unlike chatID.
+    let id = (await conversations()).find(c => (c.name || '').toLowerCase() === want)?.id;
+    if (!id) {
+      const users = (await api('users.list', {limit: 1000})).members || [];
+      const user = users.find(u => [u.profile?.display_name, u.real_name, u.name].some(n => (n || '').toLowerCase() === want));
+      if (user) id = (await api('conversations.open', {users: user.id})).channel?.id;
+    }
+    if (!id) throw new Error('No Slack conversation named ' + name);
+    const entry = document.querySelector('[data-qa-channel-sidebar-channel-id="' + id + '"]');
+    if (entry) entry.click(); else location.assign('/client/' + team.id + '/' + id);
+    return JSON.stringify(true);
+    """
+
+    /// Teams titles a notification with the chat's name; its chat list item
+    /// (`title-chat-list-item_<conversation id>`) switches in place.
+    private static let teamsOpen = """
+    const want = chat.trim().toLowerCase();
+    let item = null;
+    for (let i = 0; i < 20 && !item; i++) {
+      const items = [...document.querySelectorAll('[id^="title-chat-list-item_"]')];
+      item = items.find(e => e.innerText.trim().toLowerCase() === want)
+        || items.find(e => want.includes(e.innerText.trim().toLowerCase()) && e.innerText.trim().length > 2);
+      if (!item) await sleep(250);
+    }
+    if (!item) throw new Error('No Teams chat named ' + chat + ' in the chat list');
+    item.click();
+    return JSON.stringify(true);
+    """
 
     private static let common = """
     const sleep = ms => new Promise(r => setTimeout(r, ms));
