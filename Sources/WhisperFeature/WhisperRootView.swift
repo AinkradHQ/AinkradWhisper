@@ -2,9 +2,8 @@ import AppKit
 import SwiftUI
 import AinkradAppKit
 
-/// The account rail and the selected account's live web client, built from
-/// the kit: `AinkradAppTile` tiles, `AinkradMenuButton` to add, and the kit's
-/// modal and confirm dialog instead of native alerts.
+/// The account sidebar and the selected account's live web client, built from
+/// kit components: list rows, a footer button, the kit modal and confirm dialog.
 struct WhisperRootView: View {
     let store: WhisperStore
     let launcher: PluginAppLauncher
@@ -16,6 +15,7 @@ struct WhisperRootView: View {
 
     /// What the modal is editing.
     private enum Editor: Equatable {
+        case add
         case rename(Account)
         case addWebApp
     }
@@ -26,7 +26,7 @@ struct WhisperRootView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            rail
+            sidebar
             content
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -52,52 +52,47 @@ struct WhisperRootView: View {
 
     @ViewBuilder private var content: some View {
         if let account = store.accounts.first(where: { $0.id == store.selection }) {
-            Group {
-                if isDialogUp {
-                    theme.surface
-                } else {
-                    WhisperWebHost(store: store, account: account)
-                }
+            if isDialogUp {
+                theme.background.frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                WhisperWebHost(store: store, account: account)
             }
-            .clipShape(ChamferShape(cut: AinkradRadius.sm))
-            .padding([.vertical, .trailing], AinkradSpacing.sm)
         } else {
             AinkradEmptyState(icon: WhisperApp.icon, title: "No accounts yet",
-                              message: "Add Slack, Teams or WhatsApp with the + in the rail, then sign in once.")
+                              message: "Add Slack, Teams or WhatsApp and sign in once.",
+                              actionTitle: "Add account") { open(.add, text: "") }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
-    private var rail: some View {
-        VStack(spacing: AinkradSpacing.sm) {
+    /// Same shape as Quest's project sidebar: a section header, kit list
+    /// rows, row actions in the context menu, the add action in the footer.
+    private var sidebar: some View {
+        VStack(alignment: .leading, spacing: AinkradSpacing.sm) {
+            AinkradSectionHeader(title: "Accounts")
             ScrollView {
-                VStack(spacing: AinkradSpacing.md) {
+                LazyVStack(spacing: AinkradSpacing.xs) {
                     ForEach(store.accounts) { account in
-                        AccountTile(account: account, unread: store.unread[account.id] ?? 0,
-                                    isSelected: account.id == store.selection,
-                                    isLoaded: store.isLoaded(account.id)) { store.selection = account.id }
+                        let unread = store.unread[account.id] ?? 0
+                        AinkradListRow(isSelected: account.id == store.selection,
+                                       onTap: { store.selection = account.id },
+                                       leading: { AinkradIconGlyph(systemName: account.service.icon) },
+                                       title: account.label,
+                                       subtitle: store.isLoaded(account.id) ? account.service.name
+                                                                             : "\(account.service.name) · hibernated",
+                                       trailing: {
+                                           if unread > 0 { AinkradBadge(text: unread > 99 ? "99+" : "\(unread)", status: .danger) }
+                                       })
                             .ainkradContextMenu(menu(for: account))
                     }
                 }
-                .padding(.vertical, AinkradSpacing.md)
             }
             .scrollIndicators(.never)
-            AinkradMenuButton(items: addItems) {
-                AinkradAppTile(symbol: "plus", size: 36)
-                    .help("Add an account")
-                    .accessibilityLabel("Add an account")
-            }
-            .padding(.bottom, AinkradSpacing.md)
+            Spacer(minLength: 0)
+            AinkradButton(title: "Add account", style: .secondary, icon: "plus") { open(.add, text: "") }
         }
-        .frame(width: 68)
-    }
-
-    private var addItems: [AinkradMenuItem] {
-        [Service.slack, .teams, .whatsapp].map { service in
-            AinkradMenuItem(title: service.name, systemName: service.icon) {
-                store.add(Account(service: service, label: store.freshLabel(for: service)))
-            }
-        } + [AinkradMenuItem(title: "Other web app…", systemName: Service.custom.icon) { open(.addWebApp, text: "https://") }]
+        .padding(AinkradSpacing.md)
+        .frame(width: 220)
     }
 
     private func menu(for account: Account) -> [AinkradMenuItem] {
@@ -121,72 +116,63 @@ struct WhisperRootView: View {
         return url
     }
 
-    private var canSave: Bool {
+    @ViewBuilder private var editorForm: some View {
         switch editor {
-        case .rename: !editorText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        case .addWebApp: webAppURL != nil
-        case nil: false
+        case .add: addForm
+        case .rename(let account):
+            textForm(title: "Rename account", subtitle: "How it is listed in the sidebar.", placeholder: "Name",
+                     action: "Save", enabled: !editorText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) {
+                store.rename(account.id, to: editorText)
+            }
+        case .addWebApp:
+            textForm(title: "Add a web app", subtitle: "Any chat app with a web client, by its https:// address.",
+                     placeholder: "https://chat.example.com", action: "Add", enabled: webAppURL != nil) {
+                if let url = webAppURL { store.add(Account(service: .custom, label: url.host ?? "Web", customURL: url)) }
+            }
+        case nil: EmptyView()
         }
     }
 
-    private var editorForm: some View {
-        let isRename = if case .rename = editor { true } else { false }
-        return VStack(alignment: .leading, spacing: AinkradSpacing.md) {
-            AinkradSectionHeader(title: isRename ? "Rename account" : "Add a web app",
-                                 subtitle: isRename ? "How it is listed in the rail."
-                                                    : "Any chat app with a web client, by its https:// address.")
-            AinkradTextField(text: $editorText, placeholder: isRename ? "Name" : "https://chat.example.com")
-                .onSubmit(save)
-            HStack(spacing: AinkradSpacing.sm) {
+    private var addForm: some View {
+        VStack(alignment: .leading, spacing: AinkradSpacing.md) {
+            AinkradSectionHeader(title: "Add account", subtitle: "Sign in once inside Whisper; it stays signed in.")
+            VStack(spacing: AinkradSpacing.xs) {
+                ForEach([Service.slack, .teams, .whatsapp], id: \.self) { service in
+                    AinkradListRow(onTap: {
+                                       store.add(Account(service: service, label: store.freshLabel(for: service)))
+                                       editor = nil
+                                   },
+                                   leading: { AinkradIconGlyph(systemName: service.icon) },
+                                   title: service.name,
+                                   trailing: { EmptyView() })
+                }
+                AinkradListRow(onTap: { open(.addWebApp, text: "https://") },
+                               leading: { AinkradIconGlyph(systemName: Service.custom.icon) },
+                               title: "Other web app", subtitle: "By its https:// address",
+                               trailing: { EmptyView() })
+            }
+            HStack {
                 Spacer()
                 AinkradButton(title: "Cancel", style: .ghost) { editor = nil }
-                AinkradButton(title: isRename ? "Save" : "Add", style: .primary, action: save)
-                    .disabled(!canSave)
-                    .opacity(canSave ? 1 : 0.5)
             }
         }
     }
 
-    private func save() {
-        guard canSave else { return }
-        switch editor {
-        case .rename(let account): store.rename(account.id, to: editorText)
-        case .addWebApp:
-            if let url = webAppURL { store.add(Account(service: .custom, label: url.host ?? "Web", customURL: url)) }
-        case nil: break
+    private func textForm(title: String, subtitle: String, placeholder: String, action: String,
+                          enabled: Bool, commit: @escaping () -> Void) -> some View {
+        let save = { guard enabled else { return }; commit(); editor = nil }
+        return VStack(alignment: .leading, spacing: AinkradSpacing.md) {
+            AinkradSectionHeader(title: title, subtitle: subtitle)
+            AinkradTextField(text: $editorText, placeholder: placeholder)
+                .onSubmit(save)
+            HStack(spacing: AinkradSpacing.sm) {
+                Spacer()
+                AinkradButton(title: "Cancel", style: .ghost) { editor = nil }
+                AinkradButton(title: action, style: .primary, action: save)
+                    .disabled(!enabled)
+                    .opacity(enabled ? 1 : 0.5)
+            }
         }
-        editor = nil
-    }
-}
-
-/// One account: the kit's app tile with the service glyph and the account's
-/// name under it, plus an unread badge.
-private struct AccountTile: View {
-    let account: Account
-    let unread: Int
-    let isSelected: Bool
-    let isLoaded: Bool
-    let onSelect: () -> Void
-
-    var body: some View {
-        Button(action: onSelect) {
-            AinkradAppTile(symbol: account.service.icon, title: account.label, size: 36, isSelected: isSelected)
-                .opacity(isLoaded || isSelected ? 1 : 0.6)
-                .overlay(alignment: .topTrailing) {
-                    if unread > 0 {
-                        AinkradBadge(text: unread > 99 ? "99+" : "\(unread)", status: .danger)
-                            .fixedSize()
-                            .offset(x: 6, y: -6)
-                    }
-                }
-                .frame(width: 60)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .help(isLoaded ? "\(account.label) · \(account.service.name)"
-                       : "\(account.label) · \(account.service.name) · hibernated, loads when opened")
-        .accessibilityLabel("\(account.label), \(account.service.name), \(unread > 0 ? "\(unread) unread" : "nothing unread")")
-        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 }
 
