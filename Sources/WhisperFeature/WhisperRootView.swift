@@ -50,21 +50,12 @@ struct WhisperRootView: View {
 
     @ViewBuilder private var content: some View {
         if let account = store.accounts.first(where: { $0.id == store.selection }) {
-            // AinkradCard's look (chamfer, surface fill, accent hairline)
-            // with a steady glow and none of the card's hover effects.
-            Group {
-                if isDialogUp {
-                    theme.surface
-                } else {
-                    WhisperWebHost(store: store, account: account)
-                }
+            // Edge to edge: the host pane already frames it.
+            if isDialogUp {
+                theme.background
+            } else {
+                WhisperWebHost(store: store, account: account)
             }
-            .clipShape(ChamferShape(cut: AinkradRadius.md))
-            .background(ChamferShape(cut: AinkradRadius.md).fill(theme.surface.opacity(0.9)))
-            // A steady glow: nothing on this card moves or brightens with the pointer.
-            .overlay(ChamferShape(cut: AinkradRadius.md).strokeBorder(theme.accentSecondary.opacity(0.5), lineWidth: 1))
-            .shadow(color: theme.accentSecondary.opacity(0.3), radius: 10)
-            .padding([.vertical, .trailing], AinkradSpacing.sm)
         } else {
             AinkradEmptyState(icon: WhisperApp.icon, title: "No accounts yet",
                               message: "Add Slack, Teams, WhatsApp or Google Meet with the + in the sidebar, then sign in once.")
