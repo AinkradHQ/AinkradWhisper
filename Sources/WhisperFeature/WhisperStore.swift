@@ -149,8 +149,11 @@ import WebKit
     /// throttles a view with none, and off screen, because nobody should see it.
     private func parkingWindow() -> NSWindow {
         if let parking { return parking }
-        let window = NSWindow(contentRect: NSRect(x: -30_000, y: -30_000, width: 1200, height: 800),
-                              styleMask: [.borderless], backing: .buffered, defer: false)
+        let window = ParkingWindow(contentRect: NSRect(x: -30_000, y: -30_000, width: 1200, height: 800),
+                                   styleMask: [.borderless], backing: .buffered, defer: false)
+        // macOS pulls an off-screen window back onto a screen (display or
+        // Space changes), so it is also fully transparent.
+        window.alphaValue = 0
         window.isReleasedWhenClosed = false
         window.ignoresMouseEvents = true
         window.collectionBehavior = [.transient, .ignoresCycle, .stationary]
@@ -319,4 +322,9 @@ import WebKit
         let state = State(accounts: accounts, hibernateMinutes: hibernateMinutes)
         documents.setData(try? JSONEncoder().encode(state), forKey: Self.stateKey)
     }
+}
+
+/// The parking window, which AppKit may not move back onto a screen.
+private final class ParkingWindow: NSWindow {
+    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect { frameRect }
 }
