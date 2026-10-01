@@ -22,6 +22,7 @@ import WebKit
     @ObservationIgnored private var hibernateTimer: Timer?
     @ObservationIgnored private var noNap: NSObjectProtocol?
     @ObservationIgnored private var presenceObservers: [NSObjectProtocol] = []
+    private var canSave = true
 
     private static let stateKey = "state"
     private struct State: Codable {
@@ -32,11 +33,13 @@ import WebKit
     public init(documents: PluginDocumentStore, signals: PluginSignalEmitter) {
         self.documents = documents
         self.signals = signals
-        if let data = documents.data(forKey: Self.stateKey),
-           let state = try? JSONDecoder().decode(State.self, from: data) {
-            accounts = state.accounts
-            hibernateMinutes = state.hibernateMinutes
-        }
+        let loaded = loadDocument(State.self, key: Self.stateKey, from: documents, app: "whisper")
+        // canSave first: hibernateMinutes's didSet saves, and under @Observable
+        // that setter runs even for this init assignment, so the guard must
+        // already hold the loaded value before any save can run.
+        canSave = loaded.canSave
+        accounts = loaded.value?.accounts ?? []
+        hibernateMinutes = loaded.value?.hibernateMinutes ?? 15
         selection = accounts.first?.id
         // Kept-connected accounts must be live to notify, pane open or not.
         // Deferred, so building the store (MCP listing, Settings) stays cheap
@@ -319,8 +322,18 @@ import WebKit
     }
 
     private func save() {
+        guard canSave else {
+            AinkradLog.logger(app: "whisper", area: "persistence")
+                .error("saving is off: the loaded document did not decode and could not be set aside")
+            return
+        }
         let state = State(accounts: accounts, hibernateMinutes: hibernateMinutes)
-        documents.setData(try? JSONEncoder().encode(state), forKey: Self.stateKey)
+        guard let data = try? JSONEncoder().encode(state) else {
+            AinkradLog.logger(app: "whisper", area: "persistence")
+                .error("could not encode whisper state; not saving")
+            return
+        }
+        documents.setData(data, forKey: Self.stateKey)
     }
 }
 
