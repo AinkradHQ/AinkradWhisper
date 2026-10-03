@@ -1,0 +1,20 @@
+# design-lint baseline. Counts only go down: `make lint` lowers them.
+# Raising one needs `make lint-rebaseline`, DESIGN_LINT_ALLOW_RAISE=1 on push, and a PR note.
+version 1
+format off
+font-size 2
+padding-literal 1
+spacing-literal 0
+radius-literal 2
+hex-color 0
+raw-color 0
+raw-control 0
+file-length 0
+try-bang 0
+force-cast 0
+force-unwrap 1
+print 0
+opacity-literal 10
+frame-literal 3
+chamfer-literal 2
+motion-literal 0
