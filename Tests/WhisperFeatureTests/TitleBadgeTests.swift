@@ -1,4 +1,5 @@
 import XCTest
+
 @testable import WhisperFeature
 
 final class TitleBadgeTests: XCTestCase {
@@ -47,11 +48,28 @@ final class TitleBadgeTests: XCTestCase {
     }
 
     func testKeepConnectedDefaults() {
-        XCTAssertTrue(Account(service: .whatsapp, label: "W", keepConnected: false).staysConnected, "WhatsApp cannot hibernate")
+        XCTAssertTrue(
+            Account(service: .whatsapp, label: "W", keepConnected: false).staysConnected, "WhatsApp cannot hibernate")
         XCTAssertTrue(Account(service: .slack, label: "S").staysConnected)
         XCTAssertTrue(Account(service: .teams, label: "T").staysConnected)
         XCTAssertFalse(Account(service: .meet, label: "M").staysConnected)
         XCTAssertFalse(Account(service: .slack, label: "S", keepConnected: false).staysConnected)
         XCTAssertTrue(Account(service: .meet, label: "M", keepConnected: true).staysConnected)
+    }
+
+    func testStatusLine() {
+        XCTAssertEqual(
+            Account(service: .slack, label: "S").status(isLoaded: true), "Slack · connected · kept connected")
+        XCTAssertEqual(
+            Account(service: .meet, label: "M", muted: true).status(isLoaded: false),
+            "Google Meet · hibernated · muted · hibernates when idle")
+        XCTAssertEqual(Account(service: .whatsapp, label: "W").status(isLoaded: true), "WhatsApp · connected")
+    }
+
+    func testWebAppURLNeedsHTTPSAndAHost() {
+        XCTAssertEqual(Account.webAppURL(" https://chat.example.com/x ")?.host, "chat.example.com")
+        for bad in ["", "https://", "http://chat.example.com", "chat.example.com", "ftp://x.com"] {
+            XCTAssertNil(Account.webAppURL(bad), bad)
+        }
     }
 }

@@ -1,5 +1,5 @@
-import Foundation
 import AinkradAppKit
+import Foundation
 import WhisperFeature
 
 /// The bundle's principal class (matches `NSPrincipalClass` in Info.plist).

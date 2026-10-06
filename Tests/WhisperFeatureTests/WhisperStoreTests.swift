@@ -1,6 +1,7 @@
-import XCTest
-import Foundation
 import AinkradAppKit
+import Foundation
+import XCTest
+
 @testable import WhisperFeature
 
 @MainActor
@@ -28,6 +29,22 @@ final class WhisperStoreTests: XCTestCase {
             docs.storage["state"], seed,
             "the only copy of the user's data was overwritten")
     }
+
+    /// None of these stays connected, so neither store's deferred connect loads a page.
+    func testSaveLoadRoundTrip() {
+        let docs = MemoryDocs()
+        let store = WhisperStore(documents: docs, signals: NoopSignals())
+        store.add(Account(service: .slack, label: "Acme Slack", keepConnected: false))
+        store.add(Account(service: .meet, label: "Meet", muted: true))
+        store.add(Account(service: .custom, label: "Chat", customURL: URL(string: "https://chat.example.com")))
+        store.hibernateMinutes = 30
+
+        let reloaded = WhisperStore(documents: docs, signals: NoopSignals())
+        XCTAssertEqual(reloaded.accounts, store.accounts)
+        XCTAssertEqual(reloaded.hibernateMinutes, 30)
+        XCTAssertEqual(reloaded.selection, store.accounts.first?.id)
+        XCTAssertNil(docs.storage.keys.first { $0.contains(".corrupt-") }, "a good document was set aside")
+    }
 }
 
 /// In-memory document store for the store tests.
@@ -51,12 +68,16 @@ final class RejectingCorruptDocs: PluginDocumentStore {
 /// No-op signal emitter: the store tests never notify.
 @MainActor
 final class NoopSignals: PluginSignalEmitter {
-    func emit(kind: String, severity: SignalSeverity, title: String, body: String?,
-              importance: SignalImportance, deepLink: SignalDeepLink?,
-              actions: [SignalAction], dedupeKey: String?) {}
+    func emit(
+        kind: String, severity: SignalSeverity, title: String, body: String?,
+        importance: SignalImportance, deepLink: SignalDeepLink?,
+        actions: [SignalAction], dedupeKey: String?
+    ) {}
     func own(limit: Int) -> [SignalEvent] { [] }
-    func handleAction(_ actionID: String,
-                      _ handler: @escaping @MainActor () async -> Void) -> AgentActionToken {
+    func handleAction(
+        _ actionID: String,
+        _ handler: @escaping @MainActor () async -> Void
+    ) -> AgentActionToken {
         AgentActionToken()
     }
     func removeActionHandler(_ token: AgentActionToken) {}
