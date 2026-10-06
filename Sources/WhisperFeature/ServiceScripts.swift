@@ -22,9 +22,9 @@ enum ServiceScripts {
 
     static func script(_ operation: Operation, for service: Service) -> String? {
         switch service {
-        case .slack: common + slack + slackBody(operation)
-        case .teams: common + teams + teamsBody(operation)
-        case .whatsapp: common + whatsapp + whatsappBody(operation)
+        case .slack: prelude + slack + slackBody(operation)
+        case .teams: prelude + teams + teamsBody(operation)
+        case .whatsapp: prelude + whatsapp + whatsappBody(operation)
         case .meet, .custom: nil
         }
     }
@@ -35,9 +35,9 @@ enum ServiceScripts {
     /// Probed 2026-09-30 against each web client.
     static func openFromNotification(_ service: Service) -> String? {
         switch service {
-        case .whatsapp: common + whatsapp + "await open(chat);\nreturn JSON.stringify(true);"
-        case .slack: common + slack + slackOpen
-        case .teams: common + teamsOpen
+        case .whatsapp: prelude + whatsapp + "await open(chat);\nreturn JSON.stringify(true);"
+        case .slack: prelude + slack + slackOpen
+        case .teams: prelude + teamsOpen
         case .meet, .custom: nil
         }
     }
@@ -77,8 +77,13 @@ enum ServiceScripts {
         return JSON.stringify(true);
         """
 
-    private static let common = """
+    /// Shared by every page script, `CalendarScripts` too: `sleep`, and the
+    /// signed-in Microsoft page's MSAL cache entries from `localStorage`.
+    static let prelude = """
         const sleep = ms => new Promise(r => setTimeout(r, ms));
+        const msalEntries = () => Object.keys(localStorage)
+          .map(k => { try { return JSON.parse(localStorage[k]) } catch (_) { return null } })
+          .filter(v => v && v.credentialType);
 
         """
 
@@ -163,9 +168,8 @@ enum ServiceScripts {
     // MARK: Teams
 
     private static let teams = """
-        const tokens = () => Object.keys(localStorage)
-          .map(k => { try { return JSON.parse(localStorage[k]) } catch (_) { return null } })
-          .filter(v => v && v.credentialType === 'AccessToken' && /ic3\\.teams\\.office\\.com/.test(v.target || '')
+        const tokens = () => msalEntries()
+          .filter(v => v.credentialType === 'AccessToken' && /ic3\\.teams\\.office\\.com/.test(v.target || '')
             && Number(v.expiresOn) * 1000 > Date.now() + 60000)
           .sort((a, b) => Number(b.expiresOn) - Number(a.expiresOn));
         let tok;

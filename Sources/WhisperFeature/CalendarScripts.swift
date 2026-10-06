@@ -15,17 +15,13 @@
 enum CalendarScripts {
     static func script(for service: Service) -> String? {
         switch service {
-        case .teams: teams
-        case .meet: meet
+        case .teams: ServiceScripts.prelude + teams
+        case .meet: ServiceScripts.prelude + meet
         case .slack, .whatsapp, .custom: nil
         }
     }
 
     private static let teams = """
-        const sleep = ms => new Promise(r => setTimeout(r, ms));
-        const entries = () => Object.keys(localStorage)
-          .map(k => { try { return JSON.parse(localStorage[k]) } catch (_) { return null } })
-          .filter(v => v && v.credentialType);
         const graphAudience = jwt => {
           try {
             const aud = JSON.parse(atob(jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).aud;
@@ -37,7 +33,7 @@ enum CalendarScripts {
         const retry = async (f, n = 3) => { for (let i = 1; ; i++) { try { return await f() } catch (e) { if (i >= n) throw new Error(e.message + ' (' + location.hostname + ')'); await sleep(1500) } } };
         let token = window.__whisperGraph && window.__whisperGraph.exp > Date.now() ? window.__whisperGraph.token : null;
         for (let i = 0; i < 60 && !token; i++) {
-          const all = entries();
+          const all = msalEntries();
           // Graph's own token only: Teams also caches an Outlook-audience one with the same scopes, which Graph rejects (401).
           const cached = all.filter(v => v.credentialType === 'AccessToken' && /Calendars\\.Read/.test(v.target || '') && live(v)
               && graphAudience(v.secret))
@@ -74,7 +70,6 @@ enum CalendarScripts {
 
     // ponytail: reads Meet's rendered week strip, so a Meet redesign breaks it; FetchUserAgenda is the upgrade if Google documents it.
     private static let meet = """
-        const sleep = ms => new Promise(r => setTimeout(r, ms));
         if (!/^\\/(home|landing)?\\/?$/.test(location.pathname))
           throw new Error('Google Meet is in a meeting right now; its schedule is on the home screen');
         // The 7 day buttons, found fresh each time (Meet re-renders the strip on week changes). Their text is
