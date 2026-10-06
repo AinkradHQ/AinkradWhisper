@@ -1,5 +1,5 @@
-import AppKit
 import AinkradAppKit
+import AppKit
 import Observation
 import WebKit
 
@@ -68,8 +68,12 @@ import WebKit
     /// A label that does not collide: "Slack", then "Slack 2", "Slack 3"…
     func freshLabel(for service: Service) -> String {
         let taken = Set(accounts.map(\.label))
-        var label = service.name, n = 1
-        while taken.contains(label) { n += 1; label = "\(service.name) \(n)" }
+        var label = service.name
+        var n = 1
+        while taken.contains(label) {
+            n += 1
+            label = "\(service.name) \(n)"
+        }
         return label
     }
 
@@ -128,7 +132,7 @@ import WebKit
         webView.frame = container.bounds
         webView.autoresizingMask = [.width, .height]
         container.addSubview(webView)
-        Task { @MainActor in self.refreshPresence() } // once the view is in its window
+        Task { @MainActor in self.refreshPresence() }  // once the view is in its window
     }
 
     /// Moves every webview out of `container` so it keeps running once the pane is gone.
@@ -152,8 +156,9 @@ import WebKit
     /// throttles a view with none, and off screen, because nobody should see it.
     private func parkingWindow() -> NSWindow {
         if let parking { return parking }
-        let window = ParkingWindow(contentRect: NSRect(x: -30_000, y: -30_000, width: 1200, height: 800),
-                                   styleMask: [.borderless], backing: .buffered, defer: false)
+        let window = ParkingWindow(
+            contentRect: NSRect(x: -30_000, y: -30_000, width: 1200, height: 800),
+            styleMask: [.borderless], backing: .buffered, defer: false)
         // macOS pulls an off-screen window back onto a screen (display or
         // Space changes), so it is also fully transparent.
         window.alphaValue = 0
@@ -176,13 +181,16 @@ import WebKit
         }
         if presenceObservers.isEmpty {
             let center = NotificationCenter.default
-            for name in [NSApplication.didBecomeActiveNotification, NSApplication.didResignActiveNotification,
-                         NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification,
-                         NSWindow.didChangeOcclusionStateNotification, NSWindow.didMiniaturizeNotification,
-                         NSWindow.didDeminiaturizeNotification] {
-                presenceObservers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
-                    MainActor.assumeIsolated { self?.refreshPresence() }
-                })
+            for name in [
+                NSApplication.didBecomeActiveNotification, NSApplication.didResignActiveNotification,
+                NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification,
+                NSWindow.didChangeOcclusionStateNotification, NSWindow.didMiniaturizeNotification,
+                NSWindow.didDeminiaturizeNotification,
+            ] {
+                presenceObservers.append(
+                    center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                        MainActor.assumeIsolated { self?.refreshPresence() }
+                    })
             }
         }
         guard hibernateTimer == nil else { return }
@@ -198,8 +206,10 @@ import WebKit
     func hibernateIdle(now: Date = Date()) {
         guard hibernateMinutes > 0 else { return }
         let cutoff = now.addingTimeInterval(-Double(hibernateMinutes) * 60)
-        for (id, page) in pages where !(accounts.first { $0.id == id }?.staysConnected ?? true)
-            && page.webView.window === parking && page.lastUsed < cutoff && !page.isInCall {
+        for (id, page) in pages
+        where !(accounts.first { $0.id == id }?.staysConnected ?? true)
+            && page.webView.window === parking && page.lastUsed < cutoff && !page.isInCall
+        {
             pages.removeValue(forKey: id)?.close()
             unread[id] = nil
         }
@@ -244,14 +254,15 @@ import WebKit
         link.symbol = account.service.icon
         let shared = accounts.filter { $0.service == account.service }.count > 1
         let sender = note.title.isEmpty ? account.label : note.title
-        signals.emit(kind: note.isCall ? "whisper.call" : "whisper.message",
-                     severity: note.isCall ? .warning : .info,
-                     title: shared ? "\(sender) · \(account.label)" : sender,
-                     body: note.body.isEmpty ? nil : note.body,
-                     importance: .urgent,
-                     deepLink: link,
-                     actions: actions,
-                     dedupeKey: note.isCall ? nil : note.groupKey(account: id))
+        signals.emit(
+            kind: note.isCall ? "whisper.call" : "whisper.message",
+            severity: note.isCall ? .warning : .info,
+            title: shared ? "\(sender) · \(account.label)" : sender,
+            body: note.body.isEmpty ? nil : note.body,
+            importance: .urgent,
+            deepLink: link,
+            actions: actions,
+            dedupeKey: note.isCall ? nil : note.groupKey(account: id))
     }
 
     /// The user is already looking at this account: Ainkrad is frontmost and
@@ -262,7 +273,9 @@ import WebKit
     }
 
     private func isOnScreen(_ page: WhisperPage) -> Bool {
-        guard NSApp.isActive, let window = page.webView.window, window !== parking, window.isVisible else { return false }
+        guard NSApp.isActive, let window = page.webView.window, window !== parking, window.isVisible else {
+            return false
+        }
         return window.occlusionState.contains(.visible)
     }
 
@@ -299,7 +312,10 @@ import WebKit
     /// The JSON target, or a bare account id from a notification raised before targets existed.
     private func decodeTarget(_ payload: String) -> NotificationTarget? {
         if let target = try? JSONDecoder().decode(NotificationTarget.self, from: Data(payload.utf8)),
-           accounts.contains(where: { $0.id == target.account }) { return target }
+            accounts.contains(where: { $0.id == target.account })
+        {
+            return target
+        }
         guard let id = UUID(uuidString: payload), accounts.contains(where: { $0.id == id }) else { return nil }
         return NotificationTarget(account: id, note: "", chat: "")
     }

@@ -39,8 +39,11 @@ public enum Service: String, Codable, CaseIterable, Sendable {
     var domains: [String] {
         switch self {
         case .slack: ["slack.com", "slack-edge.com"]
-        case .teams: ["microsoft.com", "microsoftonline.com", "live.com", "office.com",
-                      "office.net", "cloud.microsoft", "skype.com", "sharepoint.com"]
+        case .teams:
+            [
+                "microsoft.com", "microsoftonline.com", "live.com", "office.com",
+                "office.net", "cloud.microsoft", "skype.com", "sharepoint.com",
+            ]
         case .whatsapp: ["whatsapp.com", "whatsapp.net"]
         // Meet plus Google sign-in and the static hosts its call UI loads from.
         case .meet: ["google.com", "gstatic.com", "googleusercontent.com", "googleapis.com"]
@@ -106,8 +109,9 @@ struct PageNotification: Equatable, Sendable {
     /// Incoming calls and huddle invites, across the services' wordings.
     var isCall: Bool {
         let text = "\(title) \(body)"
-        return text.range(of: #"incoming (voice |video )?call|is calling|calling you|video call|voice call|huddle"#,
-                          options: [.regularExpression, .caseInsensitive]) != nil
+        return text.range(
+            of: #"incoming (voice |video )?call|is calling|calling you|video call|voice call|huddle"#,
+            options: [.regularExpression, .caseInsensitive]) != nil
     }
 
     /// One entry per chat: repeats from the same chat within a minute fold

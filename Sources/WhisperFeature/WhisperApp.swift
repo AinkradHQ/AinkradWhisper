@@ -1,6 +1,6 @@
+import AinkradAppKit
 import AppKit
 import SwiftUI
-import AinkradAppKit
 
 /// Slack, Teams and WhatsApp in one pane, each through its official web client.
 public struct WhisperApp: AinkradApp {
@@ -42,7 +42,8 @@ public struct WhisperApp: AinkradApp {
                 help: "\(account.service.name) · \(store.isLoaded(account.id) ? "connected" : "not loaded")"
                     + (account.isMuted ? " · notifications muted" : "")
                     + (account.service.canHibernate
-                        ? (account.staysConnected ? " · kept connected" : " · hibernates when idle, no notifications meanwhile") : ""),
+                        ? (account.staysConnected
+                            ? " · kept connected" : " · hibernates when idle, no notifications meanwhile") : ""),
                 keywords: [account.service.name.lowercased(), "account"],
                 kind: .action(title: "Remove…") { confirmRemove(account, store) })
         }
@@ -52,21 +53,25 @@ public struct WhisperApp: AinkradApp {
             path: root, title: displayName, icon: icon, group: .installedApps, order: 0,
             groups: [
                 SettingsGroup(path: accounts, title: "Accounts", fields: accountFields),
-                SettingsGroup(path: general, title: "General", fields: [
-                    SettingsField(
-                        path: general.appending("hibernate"), label: "Hibernate idle accounts",
-                        help: "Frees accounts you have not kept connected after this long unseen; they stop notifying until opened. Right-click an account to keep it connected.",
-                        keywords: ["hibernate", "memory", "idle", "sleep"],
-                        kind: .select(
-                            options: [0, 5, 15, 30, 60].map {
-                                SettingsOption(id: "\($0)", title: $0 == 0 ? "Never" : "After \($0) min")
-                            },
-                            selection: Binding(get: { "\(store.hibernateMinutes)" },
-                                               set: { store.hibernateMinutes = Int($0) ?? 15 })),
-                        defaultDescription: "After 15 min",
-                        isModified: { store.hibernateMinutes != 15 },
-                        reset: { store.hibernateMinutes = 15 }),
-                ]),
+                SettingsGroup(
+                    path: general, title: "General",
+                    fields: [
+                        SettingsField(
+                            path: general.appending("hibernate"), label: "Hibernate idle accounts",
+                            help:
+                                "Frees accounts you have not kept connected after this long unseen; they stop notifying until opened. Right-click an account to keep it connected.",
+                            keywords: ["hibernate", "memory", "idle", "sleep"],
+                            kind: .select(
+                                options: [0, 5, 15, 30, 60].map {
+                                    SettingsOption(id: "\($0)", title: $0 == 0 ? "Never" : "After \($0) min")
+                                },
+                                selection: Binding(
+                                    get: { "\(store.hibernateMinutes)" },
+                                    set: { store.hibernateMinutes = Int($0) ?? 15 })),
+                            defaultDescription: "After 15 min",
+                            isModified: { store.hibernateMinutes != 15 },
+                            reset: { store.hibernateMinutes = 15 })
+                    ]),
             ],
             appID: id)
     }
@@ -78,26 +83,32 @@ public struct WhisperApp: AinkradApp {
                 path: group.appending("new-service"), label: "Add account",
                 help: "Sign in inside Whisper once it is added.",
                 keywords: ["add", "slack", "teams", "whatsapp", "meet", "google"],
-                kind: .select(options: Service.allCases.map { SettingsOption(id: $0.rawValue, title: $0.name) },
-                              selection: Binding(get: { draft.service.rawValue },
-                                                 set: { draft.service = Service(rawValue: $0) ?? .slack }))),
-            SettingsField(path: group.appending("new-label"), label: "Name",
-                          help: "How it is listed, e.g. \"Acme Slack\".",
-                          kind: .text(Binding(get: { draft.label }, set: { draft.label = $0 }))),
+                kind: .select(
+                    options: Service.allCases.map { SettingsOption(id: $0.rawValue, title: $0.name) },
+                    selection: Binding(
+                        get: { draft.service.rawValue },
+                        set: { draft.service = Service(rawValue: $0) ?? .slack }))),
+            SettingsField(
+                path: group.appending("new-label"), label: "Name",
+                help: "How it is listed, e.g. \"Acme Slack\".",
+                kind: .text(Binding(get: { draft.label }, set: { draft.label = $0 }))),
         ]
         if draft.service == .custom {
-            fields.append(SettingsField(path: group.appending("new-url"), label: "URL", help: "https://…",
-                                        kind: .text(Binding(get: { draft.url }, set: { draft.url = $0 }))))
+            fields.append(
+                SettingsField(
+                    path: group.appending("new-url"), label: "URL", help: "https://…",
+                    kind: .text(Binding(get: { draft.url }, set: { draft.url = $0 }))))
         }
         let problem = draft.problem
-        fields.append(SettingsField(
-            path: group.appending("new-add"), label: "Add",
-            help: problem ?? "Adds \(draft.resolvedLabel) and opens it in Whisper.",
-            kind: .action(title: "Add") {
-                guard let account = draft.account else { return }
-                store.add(account)
-                draft.reset()
-            }))
+        fields.append(
+            SettingsField(
+                path: group.appending("new-add"), label: "Add",
+                help: problem ?? "Adds \(draft.resolvedLabel) and opens it in Whisper.",
+                kind: .action(title: "Add") {
+                    guard let account = draft.account else { return }
+                    store.add(account)
+                    draft.reset()
+                }))
         return fields
     }
 
@@ -134,7 +145,8 @@ extension WhisperApp: AinkradAppMCP {
 
     private var customURL: URL? {
         guard let url = URL(string: url.trimmingCharacters(in: .whitespacesAndNewlines)),
-              url.scheme == "https", url.host != nil else { return nil }
+            url.scheme == "https", url.host != nil
+        else { return nil }
         return url
     }
 

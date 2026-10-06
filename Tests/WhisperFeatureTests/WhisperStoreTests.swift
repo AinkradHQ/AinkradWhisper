@@ -1,6 +1,7 @@
-import XCTest
-import Foundation
 import AinkradAppKit
+import Foundation
+import XCTest
+
 @testable import WhisperFeature
 
 @MainActor
@@ -51,12 +52,16 @@ final class RejectingCorruptDocs: PluginDocumentStore {
 /// No-op signal emitter: the store tests never notify.
 @MainActor
 final class NoopSignals: PluginSignalEmitter {
-    func emit(kind: String, severity: SignalSeverity, title: String, body: String?,
-              importance: SignalImportance, deepLink: SignalDeepLink?,
-              actions: [SignalAction], dedupeKey: String?) {}
+    func emit(
+        kind: String, severity: SignalSeverity, title: String, body: String?,
+        importance: SignalImportance, deepLink: SignalDeepLink?,
+        actions: [SignalAction], dedupeKey: String?
+    ) {}
     func own(limit: Int) -> [SignalEvent] { [] }
-    func handleAction(_ actionID: String,
-                      _ handler: @escaping @MainActor () async -> Void) -> AgentActionToken {
+    func handleAction(
+        _ actionID: String,
+        _ handler: @escaping @MainActor () async -> Void
+    ) -> AgentActionToken {
         AgentActionToken()
     }
     func removeActionHandler(_ token: AgentActionToken) {}

@@ -1,4 +1,5 @@
 import XCTest
+
 @testable import WhisperFeature
 
 final class TitleBadgeTests: XCTestCase {
@@ -47,7 +48,8 @@ final class TitleBadgeTests: XCTestCase {
     }
 
     func testKeepConnectedDefaults() {
-        XCTAssertTrue(Account(service: .whatsapp, label: "W", keepConnected: false).staysConnected, "WhatsApp cannot hibernate")
+        XCTAssertTrue(
+            Account(service: .whatsapp, label: "W", keepConnected: false).staysConnected, "WhatsApp cannot hibernate")
         XCTAssertTrue(Account(service: .slack, label: "S").staysConnected)
         XCTAssertTrue(Account(service: .teams, label: "T").staysConnected)
         XCTAssertFalse(Account(service: .meet, label: "M").staysConnected)

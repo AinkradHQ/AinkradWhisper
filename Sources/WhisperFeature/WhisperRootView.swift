@@ -1,6 +1,6 @@
+import AinkradAppKit
 import AppKit
 import SwiftUI
-import AinkradAppKit
 
 /// The account sidebar and the selected account's live web client, built from
 /// kit components: list rows, a footer button, the kit modal and confirm dialog.
@@ -38,9 +38,10 @@ struct WhisperRootView: View {
             isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
             title: "Remove \(removing?.label ?? "account")?",
             message: "Whisper signs out of it and deletes its local data.",
-            confirmTitle: "Remove", isDestructive: true) {
-                if let removing { store.remove(removing.id) }
-            }
+            confirmTitle: "Remove", isDestructive: true
+        ) {
+            if let removing { store.remove(removing.id) }
+        }
         // A notification click names the account and chat. It arrives as the
         // launch payload when it opened this pane, or, when the pane was already
         // open, in the host's short-lived slot, hence the poll.
@@ -57,9 +58,11 @@ struct WhisperRootView: View {
                 WhisperWebHost(store: store, account: account)
             }
         } else {
-            AinkradEmptyState(icon: WhisperApp.icon, title: "No accounts yet",
-                              message: "Add Slack, Teams, WhatsApp or Google Meet with the + in the sidebar, then sign in once.")
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            AinkradEmptyState(
+                icon: WhisperApp.icon, title: "No accounts yet",
+                message: "Add Slack, Teams, WhatsApp or Google Meet with the + in the sidebar, then sign in once."
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
@@ -71,18 +74,22 @@ struct WhisperRootView: View {
                 VStack(spacing: AinkradSpacing.sm) {
                     ForEach(store.accounts) { account in
                         let unread = store.unread[account.id] ?? 0
-                        let status = (store.isLoaded(account.id) ? account.service.name
-                                                                 : "\(account.service.name) · hibernated")
+                        let status =
+                            (store.isLoaded(account.id)
+                                ? account.service.name
+                                : "\(account.service.name) · hibernated")
                             + (account.service.canHibernate && account.staysConnected ? " · kept connected" : "")
                             + (account.isMuted ? " · muted" : "")
-                        AccountTile(symbol: account.service.icon, unread: unread,
-                                    isSelected: account.id == store.selection,
-                                    isDimmed: !store.isLoaded(account.id), isMuted: account.isMuted) {
+                        AccountTile(
+                            symbol: account.service.icon, unread: unread,
+                            isSelected: account.id == store.selection,
+                            isDimmed: !store.isLoaded(account.id), isMuted: account.isMuted
+                        ) {
                             store.selection = account.id
                         }
-                            .help("\(account.label) · \(status)")
-                            .accessibilityLabel("\(account.label), \(status)\(unread > 0 ? ", \(unread) unread" : "")")
-                            .ainkradContextMenu(menu(for: account))
+                        .help("\(account.label) · \(status)")
+                        .accessibilityLabel("\(account.label), \(status)\(unread > 0 ? ", \(unread) unread" : "")")
+                        .ainkradContextMenu(menu(for: account))
                     }
                 }
                 .padding(.vertical, AinkradSpacing.md)
@@ -103,7 +110,11 @@ struct WhisperRootView: View {
             AinkradMenuItem(title: service.name, systemName: service.icon) {
                 store.add(Account(service: service, label: store.freshLabel(for: service)))
             }
-        } + [AinkradMenuItem(title: "Other web app…", systemName: Service.custom.icon) { open(.addWebApp, text: "https://") }]
+        } + [
+            AinkradMenuItem(title: "Other web app…", systemName: Service.custom.icon) {
+                open(.addWebApp, text: "https://")
+            }
+        ]
     }
 
     private func takeLaunch() {
@@ -115,15 +126,25 @@ struct WhisperRootView: View {
             AinkradMenuItem(title: "Rename…", systemName: "pencil") { open(.rename(account), text: account.label) },
             AinkradMenuItem(title: "Reload", systemName: "arrow.clockwise") { store.reload(account.id) },
             account.isMuted
-                ? AinkradMenuItem(title: "Unmute notifications", systemName: "bell") { store.setMuted(account.id, false) }
-                : AinkradMenuItem(title: "Mute notifications", systemName: "bell.slash") { store.setMuted(account.id, true) },
-        ] + (account.service.canHibernate ? [
-            account.staysConnected
-                ? AinkradMenuItem(title: "Let it hibernate when idle", systemName: "moon.zzz") { store.setKeepConnected(account.id, false) }
-                : AinkradMenuItem(title: "Keep connected", systemName: "bolt.horizontal") { store.setKeepConnected(account.id, true) },
-        ] : []) + [
-            AinkradMenuItem(title: "Remove…", systemName: "trash", isDestructive: true) { removing = account },
+                ? AinkradMenuItem(title: "Unmute notifications", systemName: "bell") {
+                    store.setMuted(account.id, false)
+                }
+                : AinkradMenuItem(title: "Mute notifications", systemName: "bell.slash") {
+                    store.setMuted(account.id, true)
+                },
         ]
+            + (account.service.canHibernate
+                ? [
+                    account.staysConnected
+                        ? AinkradMenuItem(title: "Let it hibernate when idle", systemName: "moon.zzz") {
+                            store.setKeepConnected(account.id, false)
+                        }
+                        : AinkradMenuItem(title: "Keep connected", systemName: "bolt.horizontal") {
+                            store.setKeepConnected(account.id, true)
+                        }
+                ] : []) + [
+                AinkradMenuItem(title: "Remove…", systemName: "trash", isDestructive: true) { removing = account }
+            ]
     }
 
     private func open(_ editor: Editor, text: String) {
@@ -135,29 +156,42 @@ struct WhisperRootView: View {
 
     private var webAppURL: URL? {
         guard let url = URL(string: editorText.trimmingCharacters(in: .whitespacesAndNewlines)),
-              url.scheme == "https", url.host != nil else { return nil }
+            url.scheme == "https", url.host != nil
+        else { return nil }
         return url
     }
 
     @ViewBuilder private var editorForm: some View {
         switch editor {
         case .rename(let account):
-            textForm(title: "Rename account", subtitle: "How it is listed in the sidebar.", placeholder: "Name",
-                     action: "Save", enabled: !editorText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) {
+            textForm(
+                title: "Rename account", subtitle: "How it is listed in the sidebar.", placeholder: "Name",
+                action: "Save", enabled: !editorText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ) {
                 store.rename(account.id, to: editorText)
             }
         case .addWebApp:
-            textForm(title: "Add a web app", subtitle: "Any chat app with a web client, by its https:// address.",
-                     placeholder: "https://chat.example.com", action: "Add", enabled: webAppURL != nil) {
-                if let url = webAppURL { store.add(Account(service: .custom, label: url.host ?? "Web", customURL: url)) }
+            textForm(
+                title: "Add a web app", subtitle: "Any chat app with a web client, by its https:// address.",
+                placeholder: "https://chat.example.com", action: "Add", enabled: webAppURL != nil
+            ) {
+                if let url = webAppURL {
+                    store.add(Account(service: .custom, label: url.host ?? "Web", customURL: url))
+                }
             }
         case nil: EmptyView()
         }
     }
 
-    private func textForm(title: String, subtitle: String, placeholder: String, action: String,
-                          enabled: Bool, commit: @escaping () -> Void) -> some View {
-        let save = { guard enabled else { return }; commit(); editor = nil }
+    private func textForm(
+        title: String, subtitle: String, placeholder: String, action: String,
+        enabled: Bool, commit: @escaping () -> Void
+    ) -> some View {
+        let save = {
+            guard enabled else { return }
+            commit()
+            editor = nil
+        }
         return VStack(alignment: .leading, spacing: AinkradSpacing.md) {
             AinkradSectionHeader(title: title, subtitle: subtitle)
             AinkradTextField(text: $editorText, placeholder: placeholder)
@@ -207,11 +241,15 @@ private struct AccountTile: View {
             .shadow(color: theme.accentSecondary.opacity(isSelected ? 0.5 : 0), radius: 4)
             .frame(width: 42, height: 42)
             .background(ChamferShape(cut: 7).fill(fill))
-            .overlay(ChamferShape(cut: 7)
-                .strokeBorder(theme.accentSecondary.opacity(isSelected ? 0.6 : (hovering ? 0.35 : 0)), lineWidth: 1))
+            .overlay(
+                ChamferShape(cut: 7)
+                    .strokeBorder(theme.accentSecondary.opacity(isSelected ? 0.6 : (hovering ? 0.35 : 0)), lineWidth: 1)
+            )
             // AinkradAppTile's glow: brighter when selected, a softer one on hover.
-            .shadow(color: theme.accentPrimary.opacity(isSelected ? 0.5 : (hovering ? 0.35 : 0)),
-                    radius: isSelected || hovering ? 8 : 0)
+            .shadow(
+                color: theme.accentPrimary.opacity(isSelected ? 0.5 : (hovering ? 0.35 : 0)),
+                radius: isSelected || hovering ? 8 : 0
+            )
             .overlay(alignment: .topTrailing) {
                 if unread > 0 {
                     AinkradBadge(text: unread > 99 ? "99+" : "\(unread)", status: .danger)
