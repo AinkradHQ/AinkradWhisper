@@ -39,11 +39,7 @@ public struct WhisperApp: AinkradApp {
         var accountFields = store.accounts.map { account in
             SettingsField(
                 path: accounts.appending(account.id.uuidString), label: account.label,
-                help: "\(account.service.name) · \(store.isLoaded(account.id) ? "connected" : "not loaded")"
-                    + (account.isMuted ? " · notifications muted" : "")
-                    + (account.service.canHibernate
-                        ? (account.staysConnected
-                            ? " · kept connected" : " · hibernates when idle, no notifications meanwhile") : ""),
+                help: account.status(isLoaded: store.isLoaded(account.id)),
                 keywords: [account.service.name.lowercased(), "account"],
                 kind: .action(title: "Remove…") { confirmRemove(account, store) })
         }
@@ -143,12 +139,7 @@ extension WhisperApp: AinkradAppMCP {
         return trimmed.isEmpty ? service.name : trimmed
     }
 
-    private var customURL: URL? {
-        guard let url = URL(string: url.trimmingCharacters(in: .whitespacesAndNewlines)),
-            url.scheme == "https", url.host != nil
-        else { return nil }
-        return url
-    }
+    private var customURL: URL? { Account.webAppURL(url) }
 
     var problem: String? { service == .custom && customURL == nil ? "Enter an https:// URL." : nil }
 

@@ -75,12 +75,7 @@ struct WhisperRootView: View {
                 VStack(spacing: AinkradSpacing.sm) {
                     ForEach(store.accounts) { account in
                         let unread = store.unread[account.id] ?? 0
-                        let status =
-                            (store.isLoaded(account.id)
-                                ? account.service.name
-                                : "\(account.service.name) · hibernated")
-                            + (account.service.canHibernate && account.staysConnected ? " · kept connected" : "")
-                            + (account.isMuted ? " · muted" : "")
+                        let status = account.status(isLoaded: store.isLoaded(account.id))
                         AccountTile(
                             symbol: account.service.icon, unread: unread,
                             isSelected: account.id == store.selection,
@@ -107,7 +102,7 @@ struct WhisperRootView: View {
     }
 
     private var addItems: [AinkradMenuItem] {
-        [Service.slack, .teams, .whatsapp, .meet].map { service in
+        Service.allCases.filter { $0 != .custom }.map { service in
             AinkradMenuItem(title: service.name, systemName: service.icon) {
                 store.add(Account(service: service, label: store.freshLabel(for: service)))
             }
@@ -155,12 +150,7 @@ struct WhisperRootView: View {
 
     // MARK: Modal
 
-    private var webAppURL: URL? {
-        guard let url = URL(string: editorText.trimmingCharacters(in: .whitespacesAndNewlines)),
-            url.scheme == "https", url.host != nil
-        else { return nil }
-        return url
-    }
+    private var webAppURL: URL? { Account.webAppURL(editorText) }
 
     @ViewBuilder private var editorForm: some View {
         switch editor {

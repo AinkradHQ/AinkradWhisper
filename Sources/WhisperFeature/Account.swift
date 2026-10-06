@@ -82,6 +82,21 @@ public struct Account: Codable, Identifiable, Equatable, Sendable {
 
     var url: URL? { customURL ?? service.defaultURL }
 
+    /// One line for the rail tooltip and the Settings row, e.g.
+    /// "Slack · connected · muted · kept connected".
+    func status(isLoaded: Bool) -> String {
+        "\(service.name) · \(isLoaded ? "connected" : "hibernated")" + (isMuted ? " · muted" : "")
+            + (service.canHibernate ? (staysConnected ? " · kept connected" : " · hibernates when idle") : "")
+    }
+
+    /// A typed web-app address: https with a host, or nil.
+    static func webAppURL(_ text: String) -> URL? {
+        guard let url = URL(string: text.trimmingCharacters(in: .whitespacesAndNewlines)),
+            url.scheme == "https", url.host != nil
+        else { return nil }
+        return url
+    }
+
     func owns(_ url: URL?) -> Bool {
         guard let host = url?.host?.lowercased() else { return false }
         let domains = service == .custom ? [self.url?.host?.lowercased()].compactMap { $0 } : service.domains
