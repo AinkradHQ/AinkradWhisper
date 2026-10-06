@@ -228,7 +228,7 @@ import WebKit
         let chat: String
     }
 
-    private func notify(_ id: UUID, _ note: PageNotification) {
+    func notify(_ id: UUID, _ note: PageNotification) {
         guard let account = accounts.first(where: { $0.id == id }), !account.isMuted, !isLooking(at: id) else { return }
         let target = NotificationTarget(account: id, note: note.id, chat: note.title)
         let payload = (try? JSONEncoder().encode(target)) ?? Data(id.uuidString.utf8)
@@ -310,7 +310,7 @@ import WebKit
     }
 
     /// The JSON target, or a bare account id from a notification raised before targets existed.
-    private func decodeTarget(_ payload: String) -> NotificationTarget? {
+    func decodeTarget(_ payload: String) -> NotificationTarget? {
         if let target = try? JSONDecoder().decode(NotificationTarget.self, from: Data(payload.utf8)),
             accounts.contains(where: { $0.id == target.account })
         {

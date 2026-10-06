@@ -84,14 +84,9 @@ import Foundation
                 "\(account.label) (\(account.service.name)) has no chats for the assistant; the tools cover Slack, Teams and WhatsApp."
             )
         }
-        var arguments: [String: Any] = ["limit": min(max(input["limit"] as? Int ?? 30, 1), 200)]
-        for key in operation.required {
-            guard let value = input[key] as? String,
-                !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, value.count <= 10_000
-            else {
-                return failure("`\(key)` is required (1–10000 characters).")
-            }
-            arguments[key] = value
+        let arguments: [String: Any]
+        do { arguments = try scriptArguments(operation, input) } catch {
+            return failure("`\(error.key)` is required (1–10000 characters).")
         }
         let page = await store.loadedPage(for: account)
         do {
@@ -100,6 +95,23 @@ import Foundation
             let message = (error as NSError).userInfo["WKJavaScriptExceptionMessage"] as? String
             return failure("\(account.label): \(message ?? error.localizedDescription)")
         }
+    }
+
+    struct MissingArgument: Error { let key: String }
+
+    /// The script's JS variables: `limit` clamped to 1…200 (default 30), plus
+    /// each string the operation requires, non-blank and at most 10000 characters.
+    static func scriptArguments(
+        _ operation: ServiceScripts.Operation, _ input: [String: Any]
+    ) throws(MissingArgument) -> [String: Any] {
+        var arguments: [String: Any] = ["limit": min(max(input["limit"] as? Int ?? 30, 1), 200)]
+        for key in operation.required {
+            guard let value = input[key] as? String,
+                !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, value.count <= 10_000
+            else { throw MissingArgument(key: key) }
+            arguments[key] = value
+        }
+        return arguments
     }
 
     /// Reads each calendar account in turn and merges the events by start

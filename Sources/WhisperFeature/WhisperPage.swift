@@ -54,7 +54,11 @@ final class WhisperPage: NSObject, WKUIDelegate, WKNavigationDelegate, WKScriptM
 
     /// A call is live while the page holds the camera or microphone; such a
     /// page must never hibernate, or switching accounts would hang up.
-    var isInCall: Bool { webView.cameraCaptureState != .none || webView.microphoneCaptureState != .none }
+    var isInCall: Bool {
+        inCallForTesting ?? (webView.cameraCaptureState != .none || webView.microphoneCaptureState != .none)
+    }
+    /// Tests only: WebKit's capture state cannot be faked.
+    var inCallForTesting: Bool?
 
     func close() {
         popups.forEach { $0.close() }
@@ -101,13 +105,17 @@ final class WhisperPage: NSObject, WKUIDelegate, WKNavigationDelegate, WKScriptM
     // MARK: Messages from the page
 
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
-        guard let body = message.body as? [String: Any], body["kind"] as? String == "notify" else { return }
-        onNotify(
-            PageNotification(
-                id: String((body["id"] as? String ?? "").prefix(40)),
-                title: String((body["title"] as? String ?? "").prefix(200)),
-                body: String((body["body"] as? String ?? "").prefix(500)),
-                tag: String((body["tag"] as? String ?? "").prefix(200))))
+        if let note = Self.notification(from: message.body) { onNotify(note) }
+    }
+
+    /// The shim's `notify` message, each field capped so a page cannot flood a signal.
+    static func notification(from message: Any) -> PageNotification? {
+        guard let body = message as? [String: Any], body["kind"] as? String == "notify" else { return nil }
+        return PageNotification(
+            id: String((body["id"] as? String ?? "").prefix(40)),
+            title: String((body["title"] as? String ?? "").prefix(200)),
+            body: String((body["body"] as? String ?? "").prefix(500)),
+            tag: String((body["tag"] as? String ?? "").prefix(200)))
     }
 
     // MARK: Navigation
@@ -174,7 +182,13 @@ final class WhisperPage: NSObject, WKUIDelegate, WKNavigationDelegate, WKScriptM
         _ download: WKDownload, decideDestinationUsing response: URLResponse,
         suggestedFilename: String
     ) async -> URL? {
-        let folder = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0]
+        Self.downloadDestination(
+            for: suggestedFilename, in: FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0])
+    }
+
+    /// `folder/<name>`, or "<stem> 2.<ext>", "<stem> 3.<ext>"… when taken. Only
+    /// the last path component of the page's suggestion is used.
+    nonisolated static func downloadDestination(for suggestedFilename: String, in folder: URL) -> URL {
         let name = (suggestedFilename as NSString).lastPathComponent
         var url = folder.appendingPathComponent(name.isEmpty ? "download" : name)
         var n = 1
