@@ -17,7 +17,8 @@ final class WhisperPage: NSObject, WKUIDelegate, WKNavigationDelegate, WKScriptM
     private var popups: [NSWindow] = []
     private var titleObservation: NSKeyValueObservation?
     private var loaded = false
-    private var loadWaiters: [CheckedContinuation<Void, Never>] = []
+    private var loadWaiters: [UUID: (continuation: CheckedContinuation<Void, Never>, timeout: Task<Void, Never>)] =
+        [:]
 
     init(account: Account) {
         self.account = account
@@ -64,21 +65,28 @@ final class WhisperPage: NSObject, WKUIDelegate, WKNavigationDelegate, WKScriptM
     }
 
     /// Waits for the first finished load, up to `timeout`.
+    /// Each waiter's own timeout releases only that waiter; the load releases
+    /// them all and cancels their timeouts.
     func waitUntilLoaded(timeout: Duration = .seconds(30)) async {
         guard !loaded else { return }
+        let id = UUID()
         await withCheckedContinuation { continuation in
-            loadWaiters.append(continuation)
-            Task { @MainActor in
+            let timer = Task { @MainActor in
                 try? await Task.sleep(for: timeout)
-                self.finishWaiters()
+                guard !Task.isCancelled else { return }
+                self.loadWaiters.removeValue(forKey: id)?.continuation.resume()
             }
+            loadWaiters[id] = (continuation, timer)
         }
     }
 
     private func finishWaiters() {
-        let waiters = loadWaiters
+        let waiters = loadWaiters.values
         loadWaiters.removeAll()
-        waiters.forEach { $0.resume() }
+        for waiter in waiters {
+            waiter.timeout.cancel()
+            waiter.continuation.resume()
+        }
     }
 
     /// Runs an async JS function body in the page. `arguments` arrive as JS
