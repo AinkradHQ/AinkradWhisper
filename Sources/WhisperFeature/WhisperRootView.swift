@@ -46,6 +46,7 @@ struct WhisperRootView: View {
         // launch payload when it opened this pane, or, when the pane was already
         // open, in the host's short-lived slot, hence the poll.
         .onAppear(perform: takeLaunch)
+        // Kept: the host offers no event for this slot, so polling is the only way to see it.
         .onReceive(Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()) { _ in takeLaunch() }
     }
 
