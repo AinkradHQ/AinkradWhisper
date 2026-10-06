@@ -22,6 +22,7 @@ import WebKit
     @ObservationIgnored private var hibernateTimer: Timer?
     @ObservationIgnored private var noNap: NSObjectProtocol?
     @ObservationIgnored private var presenceObservers: [NSObjectProtocol] = []
+    @ObservationIgnored private var connectTask: Task<Void, Never>?
     private var canSave = true
 
     private static let stateKey = "state"
@@ -44,11 +45,14 @@ import WebKit
         // Kept-connected accounts must be live to notify, pane open or not.
         // Deferred, so building the store (MCP listing, Settings) stays cheap
         // and launch is not held up by three web clients loading at once.
-        Task { @MainActor [weak self] in
+        connectTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(3))
+            guard !Task.isCancelled else { return }
             self?.connectKeptAccounts()
         }
     }
+
+    deinit { connectTask?.cancel() }
 
     public func add(_ account: Account) {
         accounts.append(account)
