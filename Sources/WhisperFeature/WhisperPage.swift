@@ -121,7 +121,7 @@ final class WhisperPage: NSObject, WKUIDelegate, WKNavigationDelegate, WKScriptM
 
     // MARK: Navigation
 
-    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {  // design-lint: allow force-unwrap WKNavigationDelegate declares it implicitly unwrapped
         loaded = true
         finishWaiters()
         applyPresence()  // a reload starts from the shim's default
