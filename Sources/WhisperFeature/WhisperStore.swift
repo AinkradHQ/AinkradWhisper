@@ -50,8 +50,6 @@ import WebKit
         }
     }
 
-    public var totalUnread: Int { unread.values.reduce(0, +) }
-
     public func add(_ account: Account) {
         accounts.append(account)
         selection = account.id

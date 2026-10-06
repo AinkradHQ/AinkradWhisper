@@ -6,7 +6,7 @@
 /// Slack and Teams use the signed-in page's own token against their web APIs;
 /// WhatsApp has no API, so it drives the page. Recipes from the 2026-09-29 spike.
 enum ServiceScripts {
-    enum Operation: CaseIterable {
+    enum Operation {
         case listChats, readMessages, search, send
 
         /// String arguments the operation needs besides `limit`.
