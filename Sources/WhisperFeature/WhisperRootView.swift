@@ -294,13 +294,17 @@ private struct WhisperWebHost: NSViewRepresentable {
     let store: WhisperStore
     let account: Account
 
+    /// The store rides along as the coordinator, so dismantling reaches it
+    /// without the process-wide `WhisperApp.sharedStore`.
+    func makeCoordinator() -> WhisperStore { store }
+
     func makeNSView(context: Context) -> NSView { NSView() }
 
     func updateNSView(_ container: NSView, context: Context) {
         store.attach(account, to: container)
     }
 
-    static func dismantleNSView(_ container: NSView, coordinator: ()) {
-        MainActor.assumeIsolated { WhisperApp.sharedStore?.detach(from: container) }
+    static func dismantleNSView(_ container: NSView, coordinator store: WhisperStore) {
+        store.detach(from: container)
     }
 }
