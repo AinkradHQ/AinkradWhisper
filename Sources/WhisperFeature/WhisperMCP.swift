@@ -77,7 +77,7 @@ import Foundation
     ) async -> AgentActionResult {
         let input = (try? JSONSerialization.jsonObject(with: Data(argumentsJSON.utf8))) as? [String: Any] ?? [:]
         guard let reference = input["account"] as? String, let account = store.resolve(reference) else {
-            return failure("Unknown account. Call list_accounts and pass a label or id.")
+            return unknownAccount
         }
         guard let script = ServiceScripts.script(operation, for: account.service) else {
             return failure(
@@ -92,8 +92,7 @@ import Foundation
         do {
             return AgentActionResult(text: try await page.run(script, arguments: arguments), isError: false)
         } catch {
-            let message = (error as NSError).userInfo["WKJavaScriptExceptionMessage"] as? String
-            return failure("\(account.label): \(message ?? error.localizedDescription)")
+            return failure("\(account.label): \(message(of: error))")
         }
     }
 
@@ -123,7 +122,7 @@ import Foundation
         let targets: [Account]
         if let reference = input["account"] as? String {
             guard let account = store.resolve(reference) else {
-                return failure("Unknown account. Call list_accounts and pass a label or id.")
+                return unknownAccount
             }
             guard CalendarScripts.script(for: account.service) != nil else {
                 return failure("\(account.label) (\(account.service.name)) has no calendar; Teams and Google Meet do.")
@@ -151,14 +150,22 @@ import Foundation
                     $0.merging(["account": account.label, "service": account.service.name]) { a, _ in a }
                 }
             } catch {
-                let message = (error as NSError).userInfo["WKJavaScriptExceptionMessage"] as? String
-                errors.append(["account": account.label, "error": message ?? error.localizedDescription])
+                errors.append(["account": account.label, "error": message(of: error)])
             }
         }
         events.sort { ($0["startMs"] as? Double ?? 0) < ($1["startMs"] as? Double ?? 0) }
         return AgentActionResult(
             text: json(["days": days, "events": events, "errors": errors]),
             isError: events.isEmpty && !errors.isEmpty)
+    }
+
+    private static var unknownAccount: AgentActionResult {
+        failure("Unknown account. Call list_accounts and pass a label or id.")
+    }
+
+    /// The page's own exception message when the script threw, else the error's.
+    private static func message(of error: Error) -> String {
+        (error as NSError).userInfo["WKJavaScriptExceptionMessage"] as? String ?? error.localizedDescription
     }
 
     private static func failure(_ text: String) -> AgentActionResult { AgentActionResult(text: text, isError: true) }
