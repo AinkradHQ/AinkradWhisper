@@ -1,3 +1,4 @@
+import AinkradAppKit
 import AppKit
 import WebKit
 
@@ -143,7 +144,13 @@ final class WhisperPage: NSObject, WKUIDelegate, WKNavigationDelegate, WKScriptM
     private func applyPresence() {
         guard let presence else { return }
         webView.evaluateJavaScript(
-            "window.__whisperPresence && window.__whisperPresence(\(presence.visible), \(presence.focused))")
+            "window.__whisperPresence && window.__whisperPresence(\(presence.visible), \(presence.focused))"
+        ) { _, error in
+            // A page mid-navigation can drop it; the next didFinish reapplies presence.
+            if let error {
+                AinkradLog.logger(app: "whisper", area: "page").debug("presence not applied: \(error)")
+            }
+        }
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) { webView.reload() }
