@@ -12,6 +12,7 @@ struct WhisperRootView: View {
     @State private var editorText = ""
     @State private var removing: Account?
     @Environment(\.ainkradTheme) private var theme
+    @Environment(\.ainkradSkin) private var skin
     @Environment(\.ainkradReduceMotion) private var reduceMotion
 
     /// What the modal is editing.
@@ -98,7 +99,7 @@ struct WhisperRootView: View {
             .accessibilityLabel("Add account")
             .padding(.bottom, AinkradSpacing.md)
         }
-        .frame(width: 60)
+        .frame(width: skin.size.s60)
     }
 
     private var addItems: [AinkradMenuItem] {
@@ -192,7 +193,8 @@ struct WhisperRootView: View {
                 AinkradButton(title: "Cancel", style: .ghost) { editor = nil }
                 AinkradButton(title: action, style: .primary, action: save)
                     .disabled(!enabled)
-                    .opacity(enabled ? 1 : 0.5)
+                    // AinkradButton never enters its own .disabled state, so it is dimmed here.
+                    .opacity(enabled ? 1 : skin.opacity.o50)  // design-lint: allow opacity-literal token-gap button.disabled
             }
         }
     }
