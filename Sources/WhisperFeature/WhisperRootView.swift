@@ -76,14 +76,14 @@ struct WhisperRootView: View {
                     ForEach(store.accounts) { account in
                         let unread = store.unread[account.id] ?? 0
                         let status = account.status(isLoaded: store.isLoaded(account.id))
-                        AccountTile(
-                            symbol: account.service.icon, unread: unread,
-                            isSelected: account.id == store.selection,
-                            isDimmed: !store.isLoaded(account.id), isMuted: account.isMuted
+                        AinkradRailItem(
+                            systemName: account.service.icon, help: "\(account.label) · \(status)",
+                            isSelected: account.id == store.selection, unread: unread,
+                            isDimmed: !store.isLoaded(account.id),
+                            cornerSymbol: account.isMuted ? "bell.slash.fill" : nil
                         ) {
                             store.selection = account.id
                         }
-                        .help("\(account.label) · \(status)")
                         .accessibilityLabel("\(account.label), \(status)\(unread > 0 ? ", \(unread) unread" : "")")
                         .ainkradContextMenu(menu(for: account))
                     }
@@ -92,7 +92,7 @@ struct WhisperRootView: View {
             }
             .scrollIndicators(.never)
             AinkradMenuButton(items: addItems, placement: .trailing) {
-                AccountTile(symbol: "plus", unread: 0, isSelected: false, isDimmed: true, isMuted: false, onTap: nil)
+                AinkradRailItem(systemName: "plus", help: "Add account", isSelected: false, isDimmed: true, action: nil)
             }
             .help("Add account")
             .accessibilityLabel("Add account")
@@ -195,96 +195,6 @@ struct WhisperRootView: View {
                     .opacity(enabled ? 1 : 0.5)
             }
         }
-    }
-}
-
-/// One sidebar tile. Drawn in `AinkradListRow`'s vocabulary (chamfered fill,
-/// glowing accent edge, hover motion) because the kit has no icon-only row,
-/// and the list row's title column does not fit a 60pt sidebar.
-// ponytail: belongs in AinkradAppKit as a compact list-row variant; propose it there.
-private struct AccountTile: View {
-    let symbol: String
-    let unread: Int
-    let isSelected: Bool
-    let isDimmed: Bool
-    let isMuted: Bool
-    /// Nil when the tile is another control's label (the + menu button).
-    let onTap: (() -> Void)?
-
-    @State private var hovering = false
-    @Environment(\.ainkradTheme) private var theme
-    @Environment(\.ainkradReduceMotion) private var reduceMotion
-
-    private var fill: Color {
-        if isSelected { return theme.accentPrimary.opacity(0.18) }
-        return hovering ? theme.surfaceElevated.opacity(0.6) : .clear
-    }
-
-    private var glyphColor: Color {
-        if isSelected { return theme.accentSecondary }
-        return theme.foreground.opacity(hovering ? 0.9 : (isDimmed ? 0.45 : 0.65))
-    }
-
-    var body: some View {
-        Image(systemName: symbol)
-            .font(.system(size: 17, weight: isSelected ? .semibold : .regular))
-            .foregroundStyle(glyphColor)
-            .shadow(color: theme.accentSecondary.opacity(isSelected ? 0.5 : 0), radius: 4)
-            .frame(width: 42, height: 42)
-            .background(ChamferShape(cut: 7).fill(fill))
-            .overlay(
-                ChamferShape(cut: 7)
-                    .strokeBorder(theme.accentSecondary.opacity(isSelected ? 0.6 : (hovering ? 0.35 : 0)), lineWidth: 1)
-            )
-            // AinkradAppTile's glow: brighter when selected, a softer one on hover.
-            .shadow(
-                color: theme.accentPrimary.opacity(isSelected ? 0.5 : (hovering ? 0.35 : 0)),
-                radius: isSelected || hovering ? 8 : 0
-            )
-            .overlay(alignment: .topTrailing) {
-                if unread > 0 {
-                    AinkradBadge(text: unread > 99 ? "99+" : "\(unread)", status: .danger)
-                        .fixedSize()
-                        .scaleEffect(0.8, anchor: .topTrailing)
-                        .offset(x: 5, y: -5)
-                        // Quieter on the account you are on or pointing at:
-                        // the count is for accounts you are NOT looking at.
-                        .opacity(isSelected || hovering ? 0.45 : 1)
-                }
-            }
-            .overlay(alignment: .bottomTrailing) {
-                if isMuted {
-                    Image(systemName: "bell.slash.fill")
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundStyle(theme.foreground.opacity(0.7))
-                        .padding(3)
-                        .background(Circle().fill(theme.surfaceElevated))
-                        .offset(x: 4, y: 4)
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .overlay(alignment: .leading) {
-                // The kit's selection edge: grows in, glows when selected.
-                Capsule().fill(theme.accentSecondary)
-                    .frame(width: 3, height: isSelected ? 22 : (hovering ? 10 : 0))
-                    .shadow(color: theme.accentSecondary.opacity(isSelected ? 0.7 : 0), radius: 3)
-            }
-            .scaleEffect(hovering && !isSelected && !reduceMotion ? 1.06 : 1)
-            .contentShape(Rectangle())
-            .onHover { hovering = $0 }
-            .modifier(TapIfSet(action: onTap))
-            .animation(reduceMotion ? nil : AinkradMotion.hover, value: hovering)
-            .animation(reduceMotion ? nil : AinkradMotion.hover, value: isSelected)
-            .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
-    }
-}
-
-/// Attaches a tap only when there is one, so a tile used as a button's label
-/// leaves the click to that button.
-private struct TapIfSet: ViewModifier {
-    let action: (() -> Void)?
-    func body(content: Content) -> some View {
-        if let action { content.onTapGesture(perform: action) } else { content }
     }
 }
 
