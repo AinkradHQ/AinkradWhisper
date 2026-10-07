@@ -17,9 +17,9 @@ packages:
     # At or behind the host's pin, never ahead: the host embeds the one dynamic
     # copy of the SDK and a newer pin links symbols it does not define. See the
     # long comment in AinkradQuest/project.yml for why "behind" is not free either.
-    # 3618e86: the theme-foundation skin and kit components, matching host
-    # 0.26.0. Needs a host at 3618e86 or later.
-    revision: 3618e86aba65d9f07e5ad686f3d6822657c76ab3
+    # f4fcb8f: the theme-foundation skin and kit components plus the token-gap batch.
+    # Needs a host at f4fcb8f or later.
+    revision: f4fcb8f5d6fe3c0b49a14b72fd7ed6cb219d45be
 targets:
   WhisperFeature:
     type: library.static
