@@ -194,7 +194,7 @@ struct WhisperRootView: View {
                 AinkradButton(title: action, style: .primary, action: save)
                     .disabled(!enabled)
                     // AinkradButton never enters its own .disabled state, so it is dimmed here.
-                    .opacity(enabled ? 1 : skin.opacity.o50)  // design-lint: allow opacity-literal token-gap button.disabled
+                    .opacity(enabled ? 1 : skin.opacity.o50)  // design-lint: allow opacity-literal kit-gap button.disabled
             }
         }
     }
