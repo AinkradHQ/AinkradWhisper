@@ -19,7 +19,7 @@ packages:
     # long comment in AinkradQuest/project.yml for why "behind" is not free either.
     # f4fcb8f: the theme-foundation skin and kit components plus the token-gap batch.
     # Needs a host at f4fcb8f or later.
-    revision: 73662dd800eb501c5fa53b5cb42785db9944f3ed
+    revision: 636baa4cb5925a4603a589eaad98139e3b93d888
 targets:
   WhisperFeature:
     type: library.static
