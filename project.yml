@@ -19,7 +19,8 @@ packages:
     # long comment in AinkradQuest/project.yml for why "behind" is not free either.
     # f4fcb8f: the theme-foundation skin and kit components plus the token-gap batch.
     # Needs a host at f4fcb8f or later.
-    revision: 2f0bb8ffb982019ba93b4194f9ca7fa541fdd808
+    # aa3fc95: AinkradMenuButton keeps a custom label under Glass (#107).
+    revision: aa3fc955d523a9ec940626bddeeabd927c587737
 targets:
   WhisperFeature:
     type: library.static
